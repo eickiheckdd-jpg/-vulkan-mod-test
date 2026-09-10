@@ -6,7 +6,11 @@
   "client": [
     "MinecraftMixin",
     "GameRendererMixin",
-    "BufferBuilderMixin"
+    "LevelRendererMixin",
+    "EntityRendererMixin",
+    "ParticleEngineMixin",
+    "GuiRendererMixin",
+    "TextureManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
