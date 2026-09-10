@@ -92,7 +92,12 @@ public class VulkanCommandBuffer {
             vkCmdSetScissor(commandBuffer, 0, scissor);
 
             vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
-            vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+            if (VulkanFullscreenQuad.isInitialized()) {
+                VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+            } else {
+                vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+            }
 
             vkCmdEndRenderPass(commandBuffer);
 

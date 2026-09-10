@@ -8,6 +8,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
@@ -62,6 +63,7 @@ public class VulkanRenderer {
         VulkanRenderPass.create();
         VulkanFramebuffer.create();
         VulkanPipeline.create();
+        VulkanFullscreenQuad.initialize();
         createSyncObjects();
         VulkanCommandBuffer.create();
 
@@ -124,6 +126,17 @@ public class VulkanRenderer {
             }
 
             int imageIndex = pImageIndex.get(0);
+
+            // Capture Minecraft's framebuffer via OpenGL bridge
+            int fbWidth = VulkanTextureCapture.getViewportWidth();
+            int fbHeight = VulkanTextureCapture.getViewportHeight();
+            if (fbWidth > 0 && fbHeight > 0) {
+                ByteBuffer pixelData = VulkanTextureCapture.captureFramebuffer(fbWidth, fbHeight);
+                if (pixelData != null && VulkanFullscreenQuad.isInitialized()) {
+                    VulkanFullscreenQuad.updateTexture(pixelData, fbWidth, fbHeight);
+                    MemoryUtil.memFree(pixelData);
+                }
+            }
 
             VulkanCommandBuffer.recordCommandBuffer(imageIndex);
 
@@ -214,6 +227,7 @@ public class VulkanRenderer {
         }
 
         VulkanCommandBuffer.cleanup();
+        VulkanFullscreenQuad.cleanup();
         VulkanPipeline.cleanup();
         VulkanRenderPass.cleanup();
         VulkanFramebuffer.cleanup();
