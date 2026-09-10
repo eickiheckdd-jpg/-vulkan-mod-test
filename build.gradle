@@ -36,10 +36,6 @@ dependencies {
     // final JAR because Minecraft provides LWJGL at runtime.
     compileOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
     runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
-
-    // Mixin compile/runtime dependency (matches Fabric Loom's bundled version)
-    compileOnly "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
-    modCompileOnly "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
 }
 
 tasks.withType(JavaCompile).configureEach {

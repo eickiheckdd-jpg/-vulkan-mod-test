@@ -3,6 +3,7 @@ package net.vulkanmod.vulkan;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import org.lwjgl.glfw.GLFWVulkan;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -132,7 +133,7 @@ public class VulkanRenderer {
             pWaitSemaphores.put(0, imageAvailableSemaphores[frameIndex]).flip();
             submitInfo.pWaitSemaphores(pWaitSemaphores);
             submitInfo.pWaitDstStageMask(stack.ints(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
-            LongBuffer pCommandBuffers = stack.mallocLong(1);
+            PointerBuffer pCommandBuffers = stack.mallocPointer(1);
             pCommandBuffers.put(0, VulkanCommandBuffer.getCommandBuffers()[imageIndex]).flip();
             submitInfo.pCommandBuffers(pCommandBuffers);
             LongBuffer pSignalSemaphores = stack.mallocLong(1);
