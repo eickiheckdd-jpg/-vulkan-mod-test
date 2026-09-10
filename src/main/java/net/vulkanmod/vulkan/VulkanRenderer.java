@@ -2,6 +2,12 @@ package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
+import net.vulkanmod.render.VulkanChunkMeshBatcher;
+import net.vulkanmod.render.VulkanFrustumCuller;
+import net.vulkanmod.render.VulkanIndirectDrawSystem;
+import net.vulkanmod.render.VulkanMultiThreadedRenderer;
+import net.vulkanmod.render.VulkanTextureStreamer;
+import net.vulkanmod.vulkan.VulkanTextureCapture;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -65,6 +71,11 @@ public class VulkanRenderer {
         VulkanPipeline.create();
         VulkanFullscreenQuad.initialize();
         VulkanVertexCapture.initialize();
+        VulkanChunkMeshBatcher.initialize();
+        VulkanIndirectDrawSystem.initialize();
+        VulkanMultiThreadedRenderer.initialize();
+        VulkanTextureStreamer.initialize();
+        VulkanFrustumCuller.initialize();
         createSyncObjects();
         VulkanCommandBuffer.create();
 
@@ -144,6 +155,17 @@ public class VulkanRenderer {
             if (VulkanVertexCapture.isInitialized()) {
                 VulkanVertexCapture.uploadAndRender(VulkanCommandBuffer.getCommandBuffers()[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
             }
+
+            if (VulkanChunkMeshBatcher.isInitialized()) {
+                VulkanChunkMeshBatcher.uploadAndRender(VulkanCommandBuffer.getCommandBuffers()[imageIndex]);
+            }
+
+            if (VulkanIndirectDrawSystem.isInitialized()) {
+                VulkanIndirectDrawSystem.executeIndirectDraw(VulkanCommandBuffer.getCommandBuffers()[imageIndex]);
+            }
+
+            VulkanTextureStreamer.processTextureQueue();
+            VulkanMultiThreadedRenderer.waitForRenderThread();
 
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
@@ -232,8 +254,13 @@ public class VulkanRenderer {
         }
 
         VulkanCommandBuffer.cleanup();
+        VulkanMultiThreadedRenderer.cleanup();
+        VulkanIndirectDrawSystem.cleanup();
+        VulkanChunkMeshBatcher.cleanup();
         VulkanVertexCapture.cleanup();
         VulkanFullscreenQuad.cleanup();
+        VulkanTextureStreamer.cleanup();
+        VulkanFrustumCuller.cleanup();
         VulkanPipeline.cleanup();
         VulkanRenderPass.cleanup();
         VulkanFramebuffer.cleanup();
