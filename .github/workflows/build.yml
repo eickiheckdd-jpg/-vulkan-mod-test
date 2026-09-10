@@ -25,6 +25,9 @@ jobs:
         with:
           gradle-version: '8.11'
 
+      - name: Verify Gradle
+        run: gradle --version
+
       - name: Build with Gradle
         run: gradle build --no-daemon --info
 
