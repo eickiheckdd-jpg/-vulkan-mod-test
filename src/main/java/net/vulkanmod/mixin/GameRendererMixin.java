@@ -6,8 +6,8 @@ import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.vulkan.VulkanRenderer;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Inject;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
