@@ -27,7 +27,7 @@ public class VulkanInstance {
     };
 
     private static VkInstance instance;
-    private static long physicalDevice;
+    private static VkPhysicalDevice physicalDevice;
     private static int graphicsQueueFamilyIndex = -1;
     private static int presentQueueFamilyIndex = -1;
     private static VkPhysicalDeviceProperties deviceProperties;
@@ -93,7 +93,7 @@ public class VulkanInstance {
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create Vulkan instance: " + result);
             }
-            instance = new VkInstance(pInstance.get(0), createInfo);
+            instance = VkInstance.create(pInstance.get(0));
 
             if (debugUtilsAvailable) {
                 LongBuffer pMessenger = stack.mallocLong(1);
@@ -141,8 +141,8 @@ public class VulkanInstance {
             LongBuffer pDevices = stack.mallocLong(pDeviceCount.get(0));
             vkEnumeratePhysicalDevices(instance, pDeviceCount, pDevices);
 
-            physicalDevice = pDevices.get(0);
-            if (physicalDevice == VK10.VK_NULL_HANDLE) {
+            physicalDevice = VkPhysicalDevice.create(pDevices.get(0));
+            if (physicalDevice == null || physicalDevice.address() == NULL) {
                 throw new RuntimeException("Failed to select physical device");
             }
 
@@ -186,7 +186,7 @@ public class VulkanInstance {
         return instance;
     }
 
-    public static long getPhysicalDevice() {
+    public static VkPhysicalDevice getPhysicalDevice() {
         return physicalDevice;
     }
 

@@ -7,7 +7,6 @@ import org.lwjgl.vulkan.*;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.vulkan.VK10.*;
-import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class VulkanRenderPass {

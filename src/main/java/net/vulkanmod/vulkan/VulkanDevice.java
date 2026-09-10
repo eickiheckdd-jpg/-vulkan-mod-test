@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan;
 
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.PointerBuffer;
 import org.lwjgl.vulkan.*;
 
 import java.nio.FloatBuffer;
@@ -11,9 +12,9 @@ import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class VulkanDevice {
-    private static long device;
-    private static long graphicsQueue;
-    private static long presentQueue;
+    private static VkDevice device;
+    private static VkQueue graphicsQueue;
+    private static VkQueue presentQueue;
     private static long commandPool;
 
     public static void create() {
@@ -50,14 +51,14 @@ public class VulkanDevice {
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create logical device: " + result);
             }
-            device = pDevice.get(0);
+            device = VkDevice.create(pDevice.get(0));
 
             LongBuffer pQueue = stack.mallocLong(1);
             vkGetDeviceQueue(device, VulkanInstance.getGraphicsQueueFamilyIndex(), 0, pQueue);
-            graphicsQueue = pQueue.get(0);
+            graphicsQueue = VkQueue.create(pQueue.get(0));
 
             vkGetDeviceQueue(device, VulkanInstance.getPresentQueueFamilyIndex(), 0, pQueue);
-            presentQueue = pQueue.get(0);
+            presentQueue = VkQueue.create(pQueue.get(0));
 
             VkCommandPoolCreateInfo poolInfo = VkCommandPoolCreateInfo.callocStack(stack);
             poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
@@ -73,15 +74,15 @@ public class VulkanDevice {
         }
     }
 
-    public static long getDevice() {
+    public static VkDevice getDevice() {
         return device;
     }
 
-    public static long getGraphicsQueue() {
+    public static VkQueue getGraphicsQueue() {
         return graphicsQueue;
     }
 
-    public static long getPresentQueue() {
+    public static VkQueue getPresentQueue() {
         return presentQueue;
     }
 
@@ -93,7 +94,7 @@ public class VulkanDevice {
         if (commandPool != VK10.VK_NULL_HANDLE) {
             vkDestroyCommandPool(device, commandPool, null);
         }
-        if (device != VK10.VK_NULL_HANDLE) {
+        if (device != null) {
             vkDestroyDevice(device, null);
         }
     }

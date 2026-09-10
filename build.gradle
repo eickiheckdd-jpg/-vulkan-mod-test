@@ -32,10 +32,10 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     // LWJGL Vulkan bindings are not bundled with Minecraft by default.
-    // Declare them as compile-only/runtime-only so the mod builds
-    // without embedding LWJGL into the mod JAR.
-    modCompileOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
-    modRuntimeOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
+    // Declare them so the mod builds. Loom will strip them from the
+    // final JAR because Minecraft provides LWJGL at runtime.
+    compileOnly "org.lwjgl:lwjgl-vulkan:3.3.1"
+    runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.1"
 }
 
 tasks.withType(JavaCompile).configureEach {

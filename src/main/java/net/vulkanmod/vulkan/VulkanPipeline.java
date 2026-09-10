@@ -2,9 +2,11 @@ package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.vulkan.VK10.*;
@@ -14,8 +16,6 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 public class VulkanPipeline {
     private static long pipeline;
     private static long pipelineLayout;
-    private static long descriptorSetLayout;
-    private static long descriptorPool;
 
     public static void create() {
         try (MemoryStack stack = stackPush()) {
@@ -161,10 +161,10 @@ public class VulkanPipeline {
             vkDestroyShaderModule(VulkanDevice.getDevice(), fragModule, null);
 
             if (vertShader != null) {
-                org.lwjgl.system.MemoryUtil.memFree(vertShader);
+                MemoryUtil.memFree(vertShader);
             }
             if (fragShader != null) {
-                org.lwjgl.system.MemoryUtil.memFree(fragShader);
+                MemoryUtil.memFree(fragShader);
             }
 
             VulkanMod.LOGGER.info("Graphics pipeline created successfully");
@@ -180,7 +180,7 @@ public class VulkanPipeline {
             }
             byte[] bytes = is.readAllBytes();
             is.close();
-            ByteBuffer buffer = org.lwjgl.system.MemoryUtil.memAlloc(bytes.length).put(bytes).flip();
+            ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length).put(bytes).flip();
             return buffer;
         } catch (Exception e) {
             VulkanMod.LOGGER.error("Failed to load shader {}: {}", path, e.getMessage());

@@ -1,6 +1,5 @@
 package net.vulkanmod.vulkan;
 
-import org.lwjgl.glfw.GLFWVk;
 import org.lwjgl.system.MemoryUtil;
 
 public class MinecraftInstance {

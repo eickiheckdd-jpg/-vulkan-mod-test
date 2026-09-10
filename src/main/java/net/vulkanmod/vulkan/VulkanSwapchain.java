@@ -1,12 +1,13 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import static org.lwjgl.system.MemoryUtil.NULL;
 
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.vulkan.VK10.*;
@@ -24,7 +25,7 @@ public class VulkanSwapchain {
 
     public static void create(long window) {
         try (MemoryStack stack = stackPush()) {
-            if (surface == NULL) {
+            if (surface == MemoryUtil.NULL) {
                 LongBuffer pSurface = stack.mallocLong(1);
                 int result = glfwCreateWindowSurface(VulkanInstance.getInstance(), window, null, pSurface);
                 if (result != VK_SUCCESS) {
