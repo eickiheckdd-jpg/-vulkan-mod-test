@@ -27,7 +27,6 @@ public class VulkanTextureStreamer {
     private static long descriptorSetLayout;
     private static long[] descriptorSets;
     private static boolean[] textureLoaded;
-    private static int currentTextureIndex = 0;
     private static boolean initialized = false;
 
     private static class TextureRequest {
@@ -147,7 +146,7 @@ public class VulkanTextureStreamer {
         }
     }
 
-    public static int requestTexture(int textureId, ByteBuffer pixelData, int width, int height) {
+    public static synchronized int requestTexture(int textureId, ByteBuffer pixelData, int width, int height) {
         if (!initialized) return -1;
 
         TextureRequest request = new TextureRequest();
@@ -157,7 +156,7 @@ public class VulkanTextureStreamer {
         request.height = height;
         textureQueue.addLast(request);
 
-        return currentTextureIndex++;
+        return textureId % MAX_TEXTURES;
     }
 
     public static void processTextureQueue() {

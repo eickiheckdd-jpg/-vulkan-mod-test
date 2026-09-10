@@ -6,6 +6,7 @@ import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanFrustumCuller;
 import net.vulkanmod.render.VulkanIndirectDrawSystem;
 import net.vulkanmod.render.VulkanMultiThreadedRenderer;
+import net.vulkanmod.render.VulkanPerformanceStats;
 import net.vulkanmod.render.VulkanTextureStreamer;
 import net.vulkanmod.vulkan.VulkanTextureCapture;
 import org.lwjgl.glfw.GLFWVulkan;
@@ -117,6 +118,8 @@ public class VulkanRenderer {
             return;
         }
 
+        VulkanPerformanceStats.beginFrame();
+
         try (MemoryStack stack = stackPush()) {
             IntBuffer pImageIndex = stack.ints(0);
             int result = vkAcquireNextImageKHR(
@@ -196,6 +199,8 @@ public class VulkanRenderer {
 
             frameIndex = (frameIndex + 1) % imageAvailableSemaphores.length;
         }
+
+        VulkanPerformanceStats.endFrame();
     }
 
     public static void recreateSwapchain() {

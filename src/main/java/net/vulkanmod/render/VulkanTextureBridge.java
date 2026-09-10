@@ -1,14 +1,19 @@
 package net.vulkanmod.render;
 
+import net.minecraft.client.texture.AbstractTexture;
+import net.minecraft.client.texture.TextureManager;
+import net.minecraft.util.Identifier;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
-import org.lwjgl.PointerBuffer;
+import net.vulkanmod.vulkan.VulkanTextureStreamer;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
-import java.nio.LongBuffer;
+import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,18 +22,22 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanTextureBridge {
-    private static final Map<Integer, Long> textureMap = new HashMap<>();
+    private static final Map<Identifier, Long> textureMap = new HashMap<>();
     private static boolean initialized = false;
     private static long stagingBuffer;
     private static long stagingBufferMemory;
+    private static long contextHandle;
 
     public static synchronized void initialize() {
         if (initialized) return;
 
-        createStagingBuffer();
-
-        initialized = true;
-        VulkanMod.LOGGER.info("Texture bridge initialized");
+        try {
+            createStagingBuffer();
+            initialized = true;
+            VulkanMod.LOGGER.info("Texture bridge initialized");
+        } catch (Exception e) {
+            VulkanMod.LOGGER.error("Failed to initialize texture bridge: {}", e.getMessage());
+        }
     }
 
     private static void createStagingBuffer() {
@@ -44,7 +53,7 @@ public class VulkanTextureBridge {
             LongBuffer pBuffer = stack.mallocLong(1);
             int result = vkCreateBuffer(device, bufferInfo, null, pBuffer);
             if (result != VK_SUCCESS) {
-                throw new RuntimeException("Failed to create texture staging buffer: " + result);
+                throw new RuntimeException("Failed to create staging buffer: " + result);
             }
             stagingBuffer = pBuffer.get(0);
 
@@ -64,35 +73,72 @@ public class VulkanTextureBridge {
             LongBuffer pBufferMemory = stack.mallocLong(1);
             result = vkAllocateMemory(device, allocInfo, null, pBufferMemory);
             if (result != VK_SUCCESS) {
-                throw new RuntimeException("Failed to allocate texture staging memory: " + result);
+                throw new RuntimeException("Failed to allocate staging memory: " + result);
             }
             stagingBufferMemory = pBufferMemory.get(0);
 
             result = vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
             if (result != VK_SUCCESS) {
-                throw new RuntimeException("Failed to bind texture staging memory: " + result);
+                throw new RuntimeException("Failed to bind staging memory: " + result);
             }
         }
     }
 
-    public static void registerTexture(int textureId, long imageView) {
-        textureMap.put(textureId, imageView);
+    public static void registerTexture(Identifier id, long imageView) {
+        textureMap.put(id, imageView);
     }
 
-    public static long getTextureImageView(int textureId) {
-        return textureMap.getOrDefault(textureId, NULL);
+    public static long getTextureImageView(Identifier id) {
+        return textureMap.getOrDefault(id, NULL);
     }
 
-    public static void uploadTextureData(int textureId, ByteBuffer pixelData, int width, int height) {
+    public static void uploadTextureData(Identifier textureId, ByteBuffer pixelData, int width, int height) {
         if (pixelData == null || pixelData.remaining() == 0) return;
 
         try (MemoryStack stack = stackPush()) {
+            long dataSize = pixelData.remaining();
             PointerBuffer pData = stack.mallocPointer(1);
-            int result = vkMapMemory(VulkanDevice.getDevice(), stagingBufferMemory, 0, pixelData.remaining(), 0, pData);
+            int result = vkMapMemory(VulkanDevice.getDevice(), stagingBufferMemory, 0, dataSize, 0, pData);
             if (result == VK_SUCCESS) {
-                MemoryUtil.memCopy(MemoryUtil.memAddress(pixelData), pData.get(0), pixelData.remaining());
+                MemoryUtil.memCopy(MemoryUtil.memAddress(pixelData), pData.get(0), dataSize);
                 vkUnmapMemory(VulkanDevice.getDevice(), stagingBufferMemory);
             }
+
+            int slot = VulkanTextureStreamer.requestTexture(textureId.hashCode(), pixelData, width, height);
+            if (slot >= 0) {
+                long descriptorSet = VulkanTextureStreamer.getDescriptorSet(slot);
+                textureMap.put(textureId, descriptorSet);
+            }
+        } catch (Exception e) {
+            VulkanMod.LOGGER.warn("Failed to upload texture data: {}", e.getMessage());
+        }
+    }
+
+    public static void captureAndUploadTexture(AbstractTexture texture, Identifier id) {
+        try {
+            int textureId = texture.getId();
+            if (textureId <= 0) return;
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            IntBuffer width = MemoryUtil.memAllocInt(1);
+            IntBuffer height = MemoryUtil.memAllocInt(1);
+            GL11.glGetTexLevelParameteriv(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH, width);
+            GL11.glGetTexLevelParameteriv(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT, height);
+            int w = width.get(0);
+            int h = height.get(0);
+            MemoryUtil.memFree(width);
+            MemoryUtil.memFree(height);
+
+            if (w <= 0 || h <= 0) return;
+
+            ByteBuffer pixelData = MemoryUtil.memAlloc(w * h * 4);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
+            GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelData);
+
+            uploadTextureData(id, pixelData, w, h);
+            MemoryUtil.memFree(pixelData);
+        } catch (Exception e) {
+            VulkanMod.LOGGER.debug("Failed to capture texture {}: {}", id, e.getMessage());
         }
     }
 

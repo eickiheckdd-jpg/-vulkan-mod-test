@@ -15,9 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
-    @Inject(method = "render", at = @At("HEAD"))
-    private void onRenderHead(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
+    @Inject(method = "renderWorld", at = @At("HEAD"), cancellable = true)
+    private void onRenderWorld(RenderTickCounter tickCounter, CallbackInfo ci) {
         if (!VulkanModConfig.getConfig().enableVulkanRenderer) return;
+        if (!VulkanModConfig.getConfig().enableFrameReplacement) return;
 
         if (!VulkanRenderer.isInitialized()) {
             try {
@@ -27,13 +28,18 @@ public class GameRendererMixin {
                 return;
             }
         }
+
+        if (VulkanRenderer.isInitialized()) {
+            VulkanMatrixExtractor.extractMatrices();
+            VulkanRenderer.render();
+            ci.cancel();
+        }
     }
 
     @Inject(method = "render", at = @At("TAIL"))
     private void onRenderTail(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
         if (!VulkanModConfig.getConfig().enableVulkanRenderer) return;
 
-        VulkanMatrixExtractor.extractMatrices();
         VulkanRenderStateTranslator.syncFromOpenGL();
     }
 }

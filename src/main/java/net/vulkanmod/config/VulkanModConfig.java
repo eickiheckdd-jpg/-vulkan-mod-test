@@ -23,6 +23,7 @@ public class VulkanModConfig {
         public boolean enableGUIRendering = true;
         public boolean enableDebugStats = false;
         public boolean enableDebugOverlay = false;
+        public boolean enableFrameReplacement = false;
         public int maxChunkMeshes = 256;
         public int maxEntities = 1024;
         public int maxParticles = 8192;
@@ -72,6 +73,7 @@ public class VulkanModConfig {
                             case "enableGUIRendering" -> config.enableGUIRendering = Boolean.parseBoolean(value);
                             case "enableDebugStats" -> config.enableDebugStats = Boolean.parseBoolean(value);
                             case "enableDebugOverlay" -> config.enableDebugOverlay = Boolean.parseBoolean(value);
+                            case "enableFrameReplacement" -> config.enableFrameReplacement = Boolean.parseBoolean(value);
                             case "maxChunkMeshes" -> config.maxChunkMeshes = Integer.parseInt(value);
                             case "maxEntities" -> config.maxEntities = Integer.parseInt(value);
                             case "maxParticles" -> config.maxParticles = Integer.parseInt(value);
@@ -113,6 +115,7 @@ public class VulkanModConfig {
             sb.append("enableGUIRendering=").append(config.enableGUIRendering).append("\n");
             sb.append("enableDebugStats=").append(config.enableDebugStats).append("\n");
             sb.append("enableDebugOverlay=").append(config.enableDebugOverlay).append("\n");
+            sb.append("enableFrameReplacement=").append(config.enableFrameReplacement).append("\n");
             sb.append("maxChunkMeshes=").append(config.maxChunkMeshes).append("\n");
             sb.append("maxEntities=").append(config.maxEntities).append("\n");
             sb.append("maxParticles=").append(config.maxParticles).append("\n");

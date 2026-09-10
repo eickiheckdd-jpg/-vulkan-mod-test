@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan;
 
-import net.vulkanmod.VulkanMod;
+import net.vulkanmod.render.VulkanMatrixExtractor;
+import net.vulkanmod.render.VulkanPerformanceStats;
 import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanIndirectDrawSystem;
 import net.vulkanmod.vulkan.VulkanVertexCapture;
@@ -115,12 +116,10 @@ public class VulkanCommandBuffer {
 
         vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
 
-        vkCmdPushConstants(commandBuffer, VulkanPipeline.getPipelineLayout(), VK10.VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f
-        ).flip());
+        float[] mvp = VulkanMatrixExtractor.getMVPMatrix();
+        if (mvp != null && mvp.length == 16) {
+            vkCmdPushConstants(commandBuffer, VulkanPipeline.getPipelineLayout(), VK10.VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(mvp).flip());
+        }
 
         if (VulkanPipeline.getDescriptorSet() != NULL) {
             vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
@@ -128,8 +127,10 @@ public class VulkanCommandBuffer {
 
         if (VulkanFullscreenQuad.isInitialized()) {
             VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+            VulkanPerformanceStats.addDrawCall(2);
         } else {
             vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+            VulkanPerformanceStats.addDrawCall(1);
         }
 
         if (VulkanVertexCapture.isInitialized()) {
