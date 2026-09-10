@@ -160,6 +160,13 @@ public class VulkanPipeline {
             vkDestroyShaderModule(VulkanDevice.getDevice(), vertModule, null);
             vkDestroyShaderModule(VulkanDevice.getDevice(), fragModule, null);
 
+            if (vertShader != null) {
+                org.lwjgl.system.MemoryUtil.memFree(vertShader);
+            }
+            if (fragShader != null) {
+                org.lwjgl.system.MemoryUtil.memFree(fragShader);
+            }
+
             VulkanMod.LOGGER.info("Graphics pipeline created successfully");
         }
     }
@@ -173,7 +180,8 @@ public class VulkanPipeline {
             }
             byte[] bytes = is.readAllBytes();
             is.close();
-            return org.lwjgl.system.MemoryUtil.memAlloc(bytes.length).put(bytes).flip();
+            ByteBuffer buffer = org.lwjgl.system.MemoryUtil.memAlloc(bytes.length).put(bytes).flip();
+            return buffer;
         } catch (Exception e) {
             VulkanMod.LOGGER.error("Failed to load shader {}: {}", path, e.getMessage());
             return null;

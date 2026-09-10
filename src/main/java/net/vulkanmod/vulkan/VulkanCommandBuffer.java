@@ -18,7 +18,7 @@ public class VulkanCommandBuffer {
 
     public static void create() {
         try (MemoryStack stack = stackPush()) {
-            int imageCount = VulkanSwapchain.getSwapchainImages().capacity();
+            int imageCount = VulkanSwapchain.getSwapchainImages().length;
             commandBuffers = new long[imageCount];
 
             VkCommandBufferAllocateInfo.Buffer allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);

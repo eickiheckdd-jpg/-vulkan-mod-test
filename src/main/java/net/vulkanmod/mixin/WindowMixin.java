@@ -1,5 +1,6 @@
 package net.vulkanmod.mixin;
 
+import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.vulkan.VulkanRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Inject;
@@ -10,6 +11,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class WindowMixin {
     @Inject(method = "update", at = @At("TAIL"))
     private void onUpdate(CallbackInfo ci) {
+        if (!VulkanModConfig.enableVulkanRenderer) {
+            return;
+        }
         if (VulkanRenderer.isInitialized()) {
             VulkanRenderer.recreateSwapchain();
         }

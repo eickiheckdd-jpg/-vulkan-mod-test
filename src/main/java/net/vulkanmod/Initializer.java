@@ -1,8 +1,6 @@
 package net.vulkanmod;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.minecraft.client.Minecraft;
 import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.vulkan.VulkanRenderer;
 import org.slf4j.Logger;
@@ -15,20 +13,14 @@ public class Initializer implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("VulkanMod initializing for Minecraft 1.21.11 (Vulkan 1.1 renderer)");
+        VulkanModConfig.load();
 
-        if (!VulkanRenderer.isVulkanAvailable()) {
-            LOGGER.error("Vulkan is NOT available on this device. VulkanMod requires Vulkan 1.1 support.");
-            LOGGER.error("The game will continue with the default OpenGL renderer.");
-            return;
+        if (VulkanModConfig.enableVulkanRenderer) {
+            LOGGER.info("Vulkan renderer is ENABLED in config. It will initialize on first frame.");
+        } else {
+            LOGGER.info("Vulkan renderer is DISABLED in config. Minecraft will use the default renderer.");
         }
 
-        try {
-            VulkanRenderer.initialize();
-            VulkanModConfig.load();
-            LOGGER.info("VulkanMod initialized successfully!");
-        } catch (Exception e) {
-            LOGGER.error("Failed to initialize Vulkan renderer: {}", e.getMessage(), e);
-            LOGGER.error("Falling back to OpenGL renderer.");
-        }
+        LOGGER.info("VulkanMod initialized successfully!");
     }
 }

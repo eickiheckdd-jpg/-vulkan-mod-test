@@ -23,4 +23,4 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
-exec "$JAVACMD" "$@"
+exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"

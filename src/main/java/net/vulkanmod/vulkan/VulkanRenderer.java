@@ -1,25 +1,35 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import net.vulkanmod.config.VulkanModConfig;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.glfw.GLFWVulkan.*;
+import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanRenderer {
+    public enum State {
+        UNINITIALIZED,
+        INITIALIZING,
+        READY,
+        ERROR
+    }
+
     private static long window;
-    private static boolean initialized = false;
+    private static State state = State.UNINITIALIZED;
     private static long[] imageAvailableSemaphores;
     private static long[] renderFinishedSemaphores;
+    private static long debugMessenger;
     private static int frameIndex = 0;
 
     public static boolean isVulkanAvailable() {
@@ -27,12 +37,15 @@ public class VulkanRenderer {
     }
 
     public static boolean isInitialized() {
-        return initialized;
+        return state == State.READY;
     }
 
-    public static void initialize() throws Exception {
-        if (initialized) return;
+    public static synchronized void initialize() throws Exception {
+        if (state != State.UNINITIALIZED) {
+            return;
+        }
 
+        state = State.INITIALIZING;
         window = MinecraftInstance.getWindowHandle();
         if (window == NULL) {
             throw new RuntimeException("Window handle not available");
@@ -50,13 +63,13 @@ public class VulkanRenderer {
         createSyncObjects();
         VulkanCommandBuffer.create();
 
-        initialized = true;
+        state = State.READY;
         VulkanMod.LOGGER.info("VulkanRenderer initialized successfully");
     }
 
     private static void createSyncObjects() {
         try (MemoryStack stack = stackPush()) {
-            int imageCount = VulkanSwapchain.getSwapchainImages().capacity();
+            int imageCount = VulkanSwapchain.getSwapchainImages().length;
             imageAvailableSemaphores = new long[imageCount];
             renderFinishedSemaphores = new long[imageCount];
 
@@ -68,7 +81,6 @@ public class VulkanRenderer {
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
             LongBuffer pSemaphore = stack.mallocLong(1);
-            LongBuffer pFence = stack.mallocLong(1);
 
             for (int i = 0; i < imageCount; i++) {
                 int result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
@@ -85,10 +97,12 @@ public class VulkanRenderer {
     }
 
     public static void render() {
-        if (!initialized) return;
+        if (state != State.READY) {
+            return;
+        }
 
         try (MemoryStack stack = stackPush()) {
-            LongBuffer pImageIndex = stack.mallocInt(1);
+            IntBuffer pImageIndex = stack.mallocInt(1);
             int result = vkAcquireNextImageKHR(
                 VulkanDevice.getDevice(),
                 VulkanSwapchain.getSwapchain(),
@@ -103,7 +117,8 @@ public class VulkanRenderer {
                 return;
             }
             if (result != VK10.VK_SUCCESS && result != VK10.VK_SUBOPTIMAL_KHR) {
-                throw new RuntimeException("Failed to acquire swapchain image: " + result);
+                VulkanMod.LOGGER.error("Failed to acquire swapchain image: {}", result);
+                return;
             }
 
             int imageIndex = pImageIndex.get(0);
@@ -119,7 +134,8 @@ public class VulkanRenderer {
 
             result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, VK10.VK_NULL_HANDLE);
             if (result != VK_SUCCESS) {
-                throw new RuntimeException("Failed to submit draw command buffer: " + result);
+                VulkanMod.LOGGER.error("Failed to submit draw command buffer: {}", result);
+                return;
             }
 
             VkPresentInfoKHR.Buffer presentInfo = VkPresentInfoKHR.callocStack(stack);
@@ -132,19 +148,24 @@ public class VulkanRenderer {
             if (result == VK10.VK_ERROR_OUT_OF_DATE_KHR || result == VK10.VK_SUBOPTIMAL_KHR) {
                 recreateSwapchain();
             } else if (result != VK10.VK_SUCCESS) {
-                throw new RuntimeException("Failed to present swapchain image: " + result);
-            }
-
-            result = vkQueueWaitIdle(VulkanDevice.getPresentQueue());
-            if (result != VK_SUCCESS) {
-                VulkanMod.LOGGER.warn("vkQueueWaitIdle returned: {}", result);
+                VulkanMod.LOGGER.error("Failed to present swapchain image: {}", result);
+                return;
             }
 
             frameIndex = (frameIndex + 1) % imageAvailableSemaphores.length;
         }
     }
 
-    private static void cleanupSwapchain() {
+    public static void recreateSwapchain() {
+        if (state != State.READY) return;
+        VulkanMod.LOGGER.info("Recreating swapchain...");
+        cleanupSwapchainResources();
+        VulkanSwapchain.create(window);
+        VulkanFramebuffer.create();
+        VulkanCommandBuffer.create();
+    }
+
+    private static void cleanupSwapchainResources() {
         if (VulkanCommandBuffer.getCommandBuffers() != null) {
             vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(),
                 VulkanCommandBuffer.getCommandBuffers());
@@ -174,7 +195,9 @@ public class VulkanRenderer {
     }
 
     public static void cleanup() {
-        if (!initialized) return;
+        if (state == State.UNINITIALIZED) return;
+
+        cleanupSwapchainResources();
 
         if (imageAvailableSemaphores != null) {
             for (long sem : imageAvailableSemaphores) {
@@ -195,16 +218,7 @@ public class VulkanRenderer {
         VulkanDevice.cleanup();
         VulkanInstance.cleanup();
 
-        initialized = false;
+        state = State.UNINITIALIZED;
         VulkanMod.LOGGER.info("VulkanRenderer cleaned up");
-    }
-
-    public static void recreateSwapchain() {
-        if (!initialized) return;
-        VulkanMod.LOGGER.info("Recreating swapchain...");
-        cleanupSwapchain();
-        VulkanSwapchain.create(window);
-        VulkanFramebuffer.create();
-        VulkanCommandBuffer.create();
     }
 }

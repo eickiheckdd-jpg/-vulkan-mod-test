@@ -14,7 +14,7 @@ public class VulkanModConfig {
         .getConfigDir()
         .resolve("vulkanmod.properties");
 
-    public static boolean enableVulkanRenderer = true;
+    public static boolean enableVulkanRenderer = false;
     public static boolean enableDebugMarkers = false;
     public static boolean enableValidationLayers = false;
     public static int renderDistanceScale = 100;
@@ -24,7 +24,7 @@ public class VulkanModConfig {
         if (Files.exists(CONFIG_PATH)) {
             try {
                 props.load(Files.newInputStream(CONFIG_PATH));
-                enableVulkanRenderer = Boolean.parseBoolean(props.getProperty("enableVulkanRenderer", "true"));
+                enableVulkanRenderer = Boolean.parseBoolean(props.getProperty("enableVulkanRenderer", "false"));
                 enableDebugMarkers = Boolean.parseBoolean(props.getProperty("enableDebugMarkers", "false"));
                 enableValidationLayers = Boolean.parseBoolean(props.getProperty("enableValidationLayers", "false"));
                 renderDistanceScale = Integer.parseInt(props.getProperty("renderDistanceScale", "100"));
@@ -35,7 +35,7 @@ public class VulkanModConfig {
             saveDefaults(props);
         }
 
-        VulkanMod.LOGGER.info("Config loaded - Vulkan renderer: {}", enableVulkanRenderer);
+        VulkanMod.LOGGER.info("Config loaded - Vulkan renderer enabled: {}", enableVulkanRenderer);
     }
 
     private static void saveDefaults(Properties props) {
