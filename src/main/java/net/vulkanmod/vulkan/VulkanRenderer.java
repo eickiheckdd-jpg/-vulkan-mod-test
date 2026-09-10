@@ -86,6 +86,7 @@ public class VulkanRenderer {
         } catch (Exception e) {
             state = State.ERROR;
             VulkanMod.LOGGER.error("Failed to initialize Vulkan renderer: {}", e.getMessage());
+            cleanupPartial();
         }
     }
 
@@ -271,5 +272,34 @@ public class VulkanRenderer {
 
         state = State.UNINITIALIZED;
         VulkanMod.LOGGER.info("VulkanRenderer cleaned up");
+    }
+
+    private static void cleanupPartial() {
+        try {
+            cleanupSwapchainResources();
+
+            if (imageAvailableSemaphores != null) {
+                for (long sem : imageAvailableSemaphores) {
+                    if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
+                }
+            }
+            if (renderFinishedSemaphores != null) {
+                for (long sem : renderFinishedSemaphores) {
+                    if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
+                }
+            }
+
+            VulkanCommandBuffer.cleanup();
+            VulkanFullscreenQuad.cleanup();
+            VulkanTextureStreamer.cleanup();
+            VulkanPipeline.cleanup();
+            VulkanRenderPass.cleanup();
+            VulkanFramebuffer.cleanup();
+            VulkanSwapchain.cleanup();
+            VulkanDevice.cleanup();
+            VulkanInstance.cleanup();
+        } catch (Exception e) {
+            VulkanMod.LOGGER.warn("Error during partial cleanup: {}", e.getMessage());
+        }
     }
 }
