@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class GameRendererMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
-        if (!VulkanModConfig.enableVulkanRenderer) {
+        if (!VulkanModConfig.getConfig().enableVulkanRenderer) {
             return;
         }
 

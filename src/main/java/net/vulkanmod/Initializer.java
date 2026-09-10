@@ -13,9 +13,9 @@ public class Initializer implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("VulkanMod initializing for Minecraft 1.21.11 (Vulkan 1.1 renderer)");
-        VulkanModConfig.load();
+        VulkanModConfig.getConfig();
 
-        if (VulkanModConfig.enableVulkanRenderer) {
+        if (VulkanModConfig.getConfig().enableVulkanRenderer) {
             LOGGER.info("Vulkan renderer is ENABLED in config. It will initialize on first frame.");
         } else {
             LOGGER.info("Vulkan renderer is DISABLED in config. Minecraft will use the default renderer.");
