@@ -182,7 +182,7 @@ public class VulkanRenderer {
             pSignalSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
             submitInfo.pSignalSemaphores(pSignalSemaphores);
 
-            result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, VK10.VK_NULL_HANDLE);
+            result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, VulkanCommandBuffer.getFence(imageIndex));
             if (result != VK_SUCCESS) {
                 VulkanMod.LOGGER.error("Failed to submit draw command buffer: {}", result);
                 return;
