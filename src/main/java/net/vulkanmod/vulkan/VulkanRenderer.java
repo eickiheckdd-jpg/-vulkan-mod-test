@@ -3,7 +3,6 @@ package net.vulkanmod.vulkan;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import org.lwjgl.glfw.GLFWVulkan;
-import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -129,14 +128,14 @@ public class VulkanRenderer {
 
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-            PointerBuffer pWaitSemaphores = stack.mallocPointer(1);
+            LongBuffer pWaitSemaphores = stack.mallocLong(1);
             pWaitSemaphores.put(0, imageAvailableSemaphores[frameIndex]).flip();
             submitInfo.pWaitSemaphores(pWaitSemaphores);
             submitInfo.pWaitDstStageMask(stack.ints(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
-            PointerBuffer pCommandBuffers = stack.mallocPointer(1);
+            LongBuffer pCommandBuffers = stack.mallocLong(1);
             pCommandBuffers.put(0, VulkanCommandBuffer.getCommandBuffers()[imageIndex]).flip();
             submitInfo.pCommandBuffers(pCommandBuffers);
-            PointerBuffer pSignalSemaphores = stack.mallocPointer(1);
+            LongBuffer pSignalSemaphores = stack.mallocLong(1);
             pSignalSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
             submitInfo.pSignalSemaphores(pSignalSemaphores);
 
@@ -148,10 +147,10 @@ public class VulkanRenderer {
 
             VkPresentInfoKHR presentInfo = VkPresentInfoKHR.callocStack(stack);
             presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
-            PointerBuffer pPresentWaitSemaphores = stack.mallocPointer(1);
+            LongBuffer pPresentWaitSemaphores = stack.mallocLong(1);
             pPresentWaitSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
             presentInfo.pWaitSemaphores(pPresentWaitSemaphores);
-            PointerBuffer pSwapchains = stack.mallocPointer(1);
+            LongBuffer pSwapchains = stack.mallocLong(1);
             pSwapchains.put(0, VulkanSwapchain.getSwapchain()).flip();
             presentInfo.pSwapchains(pSwapchains);
             presentInfo.pImageIndices(pImageIndex);

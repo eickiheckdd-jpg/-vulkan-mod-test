@@ -38,6 +38,7 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
 
     // Mixin compile/runtime dependency (matches Fabric Loom's bundled version)
+    compileOnly "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
     modCompileOnly "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
 }
 

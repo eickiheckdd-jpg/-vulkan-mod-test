@@ -41,13 +41,13 @@ public class VulkanInstance {
     public static void create() throws Exception {
         try (MemoryStack stack = stackPush()) {
             IntBuffer pExtensionCount = stack.ints(0);
-            vkEnumerateInstanceExtensionProperties(null, pExtensionCount, null);
+            vkEnumerateInstanceExtensionProperties((ByteBuffer) null, pExtensionCount, null);
             if (pExtensionCount.get(0) == 0) {
                 throw new RuntimeException("No Vulkan extensions supported");
             }
 
             VkExtensionProperties.Buffer extensions = VkExtensionProperties.calloc(pExtensionCount.get(0), stack);
-            vkEnumerateInstanceExtensionProperties(null, pExtensionCount, extensions);
+            vkEnumerateInstanceExtensionProperties((ByteBuffer) null, pExtensionCount, extensions);
 
             Set<String> availableExtensions = new HashSet<>();
             for (int i = 0; i < extensions.capacity(); i++) {

@@ -1,11 +1,11 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
-import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
@@ -29,7 +29,7 @@ public class VulkanCommandBuffer {
             allocInfo.level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             allocInfo.commandBufferCount(imageCount);
 
-            LongBuffer pCommandBuffers = stack.mallocLong(imageCount);
+            PointerBuffer pCommandBuffers = stack.mallocPointer(imageCount);
             int result = vkAllocateCommandBuffers(VulkanDevice.getDevice(), allocInfo, pCommandBuffers);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to allocate command buffers: " + result);
@@ -55,7 +55,7 @@ public class VulkanCommandBuffer {
 
     public static void recordCommandBuffer(int imageIndex) {
         try (MemoryStack stack = stackPush()) {
-            long commandBuffer = commandBuffers[imageIndex];
+            VkCommandBuffer commandBuffer = new VkCommandBuffer(commandBuffers[imageIndex], VulkanDevice.getDevice());
 
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
@@ -113,7 +113,7 @@ public class VulkanCommandBuffer {
 
     public static void cleanup() {
         if (commandBuffers != null) {
-            LongBuffer pCommandBuffers = MemoryUtil.memAllocLong(commandBuffers.length);
+            PointerBuffer pCommandBuffers = MemoryUtil.memAllocPointer(commandBuffers.length);
             for (int i = 0; i < commandBuffers.length; i++) {
                 pCommandBuffers.put(i, commandBuffers[i]);
             }

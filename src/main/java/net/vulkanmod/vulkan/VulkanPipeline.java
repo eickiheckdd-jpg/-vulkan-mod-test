@@ -125,7 +125,6 @@ public class VulkanPipeline {
             VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.callocStack(stack);
             pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
             pipelineLayoutInfo.pSetLayouts(stack.longs(0));
-            pipelineLayoutInfo.pushConstantRangeCount(0);
 
             LongBuffer pPipelineLayout = stack.mallocLong(1);
             result = vkCreatePipelineLayout(VulkanDevice.getDevice(), pipelineLayoutInfo, null, pPipelineLayout);
@@ -134,7 +133,8 @@ public class VulkanPipeline {
             }
             pipelineLayout = pPipelineLayout.get(0);
 
-            VkGraphicsPipelineCreateInfo pipelineInfo = VkGraphicsPipelineCreateInfo.callocStack(stack);
+            VkGraphicsPipelineCreateInfo.Buffer pipelineInfoBuffer = VkGraphicsPipelineCreateInfo.callocStack(1, stack);
+            VkGraphicsPipelineCreateInfo pipelineInfo = pipelineInfoBuffer.get(0);
             pipelineInfo.sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
             pipelineInfo.stageCount(2);
             pipelineInfo.pStages(shaderStages);
@@ -153,7 +153,7 @@ public class VulkanPipeline {
             pipelineInfo.basePipelineIndex(-1);
 
             LongBuffer pPipeline = stack.mallocLong(1);
-            result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfo, null, pPipeline);
+            result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfoBuffer, null, pPipeline);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create graphics pipeline: " + result);
             }
