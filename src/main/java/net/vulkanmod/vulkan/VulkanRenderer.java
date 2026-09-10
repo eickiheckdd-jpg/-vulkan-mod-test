@@ -64,6 +64,7 @@ public class VulkanRenderer {
         VulkanFramebuffer.create();
         VulkanPipeline.create();
         VulkanFullscreenQuad.initialize();
+        VulkanVertexCapture.initialize();
         createSyncObjects();
         VulkanCommandBuffer.create();
 
@@ -139,6 +140,10 @@ public class VulkanRenderer {
             }
 
             VulkanCommandBuffer.recordCommandBuffer(imageIndex);
+
+            if (VulkanVertexCapture.isInitialized()) {
+                VulkanVertexCapture.uploadAndRender(VulkanCommandBuffer.getCommandBuffers()[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+            }
 
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
@@ -227,6 +232,7 @@ public class VulkanRenderer {
         }
 
         VulkanCommandBuffer.cleanup();
+        VulkanVertexCapture.cleanup();
         VulkanFullscreenQuad.cleanup();
         VulkanPipeline.cleanup();
         VulkanRenderPass.cleanup();
