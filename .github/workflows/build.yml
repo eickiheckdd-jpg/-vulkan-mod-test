@@ -16,7 +16,7 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v4
+      - run: java -version
       - run: gradle clean build
         env:
-          JAVA_HOME: /opt/java/openjdk
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
