@@ -50,7 +50,7 @@ public class VulkanRenderer {
         return state == State.READY;
     }
 
-    public static synchronized void initialize() throws Exception {
+    public static synchronized void initialize() {
         if (state != State.UNINITIALIZED) {
             return;
         }
@@ -63,25 +63,31 @@ public class VulkanRenderer {
 
         logSystemInfo();
 
-        VulkanInstance.create();
-        VulkanInstance.selectPhysicalDevice();
-        VulkanDevice.create();
-        VulkanSwapchain.create(window);
-        VulkanRenderPass.create();
-        VulkanFramebuffer.create();
-        VulkanPipeline.create();
-        VulkanFullscreenQuad.initialize();
-        VulkanVertexCapture.initialize();
-        VulkanChunkMeshBatcher.initialize();
-        VulkanIndirectDrawSystem.initialize();
-        VulkanMultiThreadedRenderer.initialize();
-        VulkanTextureStreamer.initialize();
-        VulkanFrustumCuller.initialize();
-        createSyncObjects();
-        VulkanCommandBuffer.create();
+        try {
+            VulkanInstance.create();
+            VulkanInstance.selectPhysicalDevice();
+            VulkanDevice.create();
+            VulkanSwapchain.create(window);
+            VulkanRenderPass.create();
+            VulkanFramebuffer.create();
+            VulkanPipeline.create();
+            VulkanFullscreenQuad.initialize();
+            VulkanVertexCapture.initialize();
+            VulkanChunkMeshBatcher.initialize();
+            VulkanIndirectDrawSystem.initialize();
+            VulkanMultiThreadedRenderer.initialize();
+            VulkanTextureStreamer.initialize();
+            VulkanFrustumCuller.initialize();
+            createSyncObjects();
+            VulkanCommandBuffer.create();
 
-        state = State.READY;
-        VulkanMod.LOGGER.info("VulkanRenderer initialized successfully");
+            state = State.READY;
+            VulkanMod.LOGGER.info("VulkanRenderer initialized successfully");
+        } catch (Exception e) {
+            state = State.ERROR;
+            VulkanMod.LOGGER.error("Failed to initialize Vulkan renderer: {}", e.getMessage());
+            throw e;
+        }
     }
 
     private static void createSyncObjects() {
