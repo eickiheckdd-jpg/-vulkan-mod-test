@@ -6,6 +6,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
@@ -27,7 +28,7 @@ public class VulkanPipeline {
                 throw new RuntimeException("Failed to load shaders");
             }
 
-            PointerBuffer pVertModule = stack.mallocPointer(1);
+            LongBuffer pVertModule = stack.mallocLong(1);
             VkShaderModuleCreateInfo vertInfo = VkShaderModuleCreateInfo.callocStack(stack);
             vertInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
             vertInfo.pCode(vertShader);
@@ -37,7 +38,7 @@ public class VulkanPipeline {
             }
             long vertModule = pVertModule.get(0);
 
-            PointerBuffer pFragModule = stack.mallocPointer(1);
+            LongBuffer pFragModule = stack.mallocLong(1);
             VkShaderModuleCreateInfo fragInfo = VkShaderModuleCreateInfo.callocStack(stack);
             fragInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
             fragInfo.pCode(fragShader);
@@ -126,14 +127,14 @@ public class VulkanPipeline {
             pipelineLayoutInfo.pSetLayouts(stack.longs(0));
             pipelineLayoutInfo.pushConstantRangeCount(0);
 
-            PointerBuffer pPipelineLayout = stack.mallocPointer(1);
+            LongBuffer pPipelineLayout = stack.mallocLong(1);
             result = vkCreatePipelineLayout(VulkanDevice.getDevice(), pipelineLayoutInfo, null, pPipelineLayout);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create pipeline layout: " + result);
             }
             pipelineLayout = pPipelineLayout.get(0);
 
-            VkGraphicsPipelineCreateInfo.Buffer pipelineInfo = VkGraphicsPipelineCreateInfo.callocStack(1, stack);
+            VkGraphicsPipelineCreateInfo pipelineInfo = VkGraphicsPipelineCreateInfo.callocStack(stack);
             pipelineInfo.sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
             pipelineInfo.stageCount(2);
             pipelineInfo.pStages(shaderStages);
@@ -151,7 +152,7 @@ public class VulkanPipeline {
             pipelineInfo.basePipelineHandle(NULL);
             pipelineInfo.basePipelineIndex(-1);
 
-            PointerBuffer pPipeline = stack.mallocPointer(1);
+            LongBuffer pPipeline = stack.mallocLong(1);
             result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfo, null, pPipeline);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create graphics pipeline: " + result);

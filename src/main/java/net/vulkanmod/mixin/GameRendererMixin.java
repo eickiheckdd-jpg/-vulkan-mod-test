@@ -2,6 +2,7 @@ package net.vulkanmod.mixin;
 
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.RenderTickCounter;
+import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.vulkan.VulkanRenderer;
 import org.spongepowered.asm.mixin.Mixin;

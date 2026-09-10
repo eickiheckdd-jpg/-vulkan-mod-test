@@ -7,6 +7,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.FloatBuffer;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
@@ -70,7 +71,7 @@ public class VulkanDevice {
             poolInfo.queueFamilyIndex(VulkanInstance.getGraphicsQueueFamilyIndex());
             poolInfo.flags(VK10.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-            PointerBuffer pCommandPool = stack.mallocPointer(1);
+            LongBuffer pCommandPool = stack.mallocLong(1);
             result = vkCreateCommandPool(device, poolInfo, null, pCommandPool);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create command pool: " + result);

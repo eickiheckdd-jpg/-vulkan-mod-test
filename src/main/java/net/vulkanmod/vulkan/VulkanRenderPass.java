@@ -25,7 +25,7 @@ public class VulkanRenderPass {
             colorAttachment.stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE);
             colorAttachment.stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE);
             colorAttachment.initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
-            colorAttachment.finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            colorAttachment.finalLayout(KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
             VkAttachmentReference.Buffer colorAttachments = VkAttachmentReference.callocStack(1, stack);
             VkAttachmentReference colorAttachmentRef = colorAttachments.get(0);
@@ -53,7 +53,7 @@ public class VulkanRenderPass {
             createInfo.pSubpasses(subpasses);
             createInfo.pDependencies(dependencies);
 
-            PointerBuffer pRenderPass = stack.mallocPointer(1);
+            LongBuffer pRenderPass = stack.mallocLong(1);
             int result = vkCreateRenderPass(VulkanDevice.getDevice(), createInfo, null, pRenderPass);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create render pass: " + result);

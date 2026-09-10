@@ -22,8 +22,7 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanInstance {
     public static final String[] REQUIRED_INSTANCE_EXTENSIONS = {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+        VK_KHR_SURFACE_EXTENSION_NAME
     };
 
     public static final String[] REQUIRED_DEVICE_EXTENSIONS = {
@@ -42,13 +41,13 @@ public class VulkanInstance {
     public static void create() throws Exception {
         try (MemoryStack stack = stackPush()) {
             IntBuffer pExtensionCount = stack.ints(0);
-            vkEnumerateInstanceExtensionProperties((String[]) null, pExtensionCount, null);
+            vkEnumerateInstanceExtensionProperties(null, pExtensionCount, null);
             if (pExtensionCount.get(0) == 0) {
                 throw new RuntimeException("No Vulkan extensions supported");
             }
 
             VkExtensionProperties.Buffer extensions = VkExtensionProperties.calloc(pExtensionCount.get(0), stack);
-            vkEnumerateInstanceExtensionProperties((String[]) null, pExtensionCount, extensions);
+            vkEnumerateInstanceExtensionProperties(null, pExtensionCount, extensions);
 
             Set<String> availableExtensions = new HashSet<>();
             for (int i = 0; i < extensions.capacity(); i++) {
@@ -110,7 +109,7 @@ public class VulkanInstance {
             instance = new VkInstance(pInstance.get(0), createInfo);
 
             if (debugUtilsAvailable) {
-                PointerBuffer pMessenger = stack.mallocPointer(1);
+                LongBuffer pMessenger = stack.mallocLong(1);
                 VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
                 debugCreateInfo.sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT);
                 debugCreateInfo.flags(0);

@@ -5,7 +5,6 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
-import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
@@ -30,7 +29,7 @@ public class VulkanCommandBuffer {
             allocInfo.level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             allocInfo.commandBufferCount(imageCount);
 
-            PointerBuffer pCommandBuffers = stack.mallocPointer(imageCount);
+            LongBuffer pCommandBuffers = stack.mallocLong(imageCount);
             int result = vkAllocateCommandBuffers(VulkanDevice.getDevice(), allocInfo, pCommandBuffers);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to allocate command buffers: " + result);
@@ -43,7 +42,7 @@ public class VulkanCommandBuffer {
             fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
-            PointerBuffer pFence = stack.mallocPointer(1);
+            LongBuffer pFence = stack.mallocLong(1);
             result = vkCreateFence(VulkanDevice.getDevice(), fenceInfo, null, pFence);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create fence: " + result);
@@ -56,7 +55,7 @@ public class VulkanCommandBuffer {
 
     public static void recordCommandBuffer(int imageIndex) {
         try (MemoryStack stack = stackPush()) {
-            VkCommandBuffer commandBuffer = VkCommandBuffer.create(commandBuffers[imageIndex], VulkanDevice.getDevice());
+            long commandBuffer = commandBuffers[imageIndex];
 
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
@@ -75,7 +74,8 @@ public class VulkanCommandBuffer {
                 .extent(VkExtent2D.callocStack(stack).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight())));
             VkClearValue.Buffer clearValues = VkClearValue.callocStack(1, stack);
             VkClearValue clearValue = clearValues.get(0);
-            FloatBuffer clearColor = stack.floats(0.1f, 0.1f, 0.1f, 1.0f);
+            VkClearColorValue clearColor = VkClearColorValue.callocStack(stack);
+            clearColor.float32(stack.floats(0.1f, 0.1f, 0.1f, 1.0f));
             clearValue.color(clearColor);
             renderPassInfo.pClearValues(clearValues);
 
@@ -113,7 +113,7 @@ public class VulkanCommandBuffer {
 
     public static void cleanup() {
         if (commandBuffers != null) {
-            PointerBuffer pCommandBuffers = MemoryUtil.memAllocPointer(commandBuffers.length);
+            LongBuffer pCommandBuffers = MemoryUtil.memAllocLong(commandBuffers.length);
             for (int i = 0; i < commandBuffers.length; i++) {
                 pCommandBuffers.put(i, commandBuffers[i]);
             }

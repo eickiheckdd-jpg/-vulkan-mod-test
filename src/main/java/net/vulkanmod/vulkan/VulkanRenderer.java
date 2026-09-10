@@ -3,6 +3,7 @@ package net.vulkanmod.vulkan;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import org.lwjgl.glfw.GLFWVulkan;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -81,7 +82,7 @@ public class VulkanRenderer {
             fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
-            PointerBuffer pSemaphore = stack.mallocPointer(1);
+            LongBuffer pSemaphore = stack.mallocLong(1);
 
             for (int i = 0; i < imageCount; i++) {
                 int result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);

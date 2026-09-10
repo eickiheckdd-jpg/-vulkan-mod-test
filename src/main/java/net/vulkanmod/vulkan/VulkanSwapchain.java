@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -29,7 +30,7 @@ public class VulkanSwapchain {
     public static void create(long window) {
         try (MemoryStack stack = stackPush()) {
             if (surface == MemoryUtil.NULL) {
-                PointerBuffer pSurface = stack.mallocPointer(1);
+                LongBuffer pSurface = stack.mallocLong(1);
                 int result = glfwCreateWindowSurface(VulkanInstance.getInstance(), window, null, pSurface);
                 if (result != VK_SUCCESS) {
                     throw new RuntimeException("Failed to create window surface: " + result);
@@ -66,7 +67,7 @@ public class VulkanSwapchain {
             createInfo.surface(surface);
             createInfo.minImageCount(desiredImageCount);
             createInfo.imageFormat(imageFormat);
-            createInfo.imageColorSpace(VK10.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+            createInfo.imageColorSpace(KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
             createInfo.imageExtent(extent);
             createInfo.imageArrayLayers(1);
             createInfo.imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -77,7 +78,7 @@ public class VulkanSwapchain {
             createInfo.clipped(true);
             createInfo.oldSwapchain(VK10.VK_NULL_HANDLE);
 
-            PointerBuffer pSwapchain = stack.mallocPointer(1);
+            LongBuffer pSwapchain = stack.mallocLong(1);
             int result = vkCreateSwapchainKHR(VulkanDevice.getDevice(), createInfo, null, pSwapchain);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create swapchain: " + result);
@@ -87,7 +88,7 @@ public class VulkanSwapchain {
             IntBuffer pImageCount = stack.ints(0);
             vkGetSwapchainImagesKHR(VulkanDevice.getDevice(), swapchain, pImageCount, null);
             swapchainImages = new long[pImageCount.get(0)];
-            PointerBuffer pImages = stack.mallocPointer(pImageCount.get(0));
+            LongBuffer pImages = stack.mallocLong(pImageCount.get(0));
             vkGetSwapchainImagesKHR(VulkanDevice.getDevice(), swapchain, pImageCount, pImages);
             for (int i = 0; i < swapchainImages.length; i++) {
                 swapchainImages[i] = pImages.get(i);
@@ -95,7 +96,7 @@ public class VulkanSwapchain {
 
             imageViews = new long[swapchainImages.length];
             for (int i = 0; i < swapchainImages.length; i++) {
-                PointerBuffer pImageView = stack.mallocPointer(1);
+                LongBuffer pImageView = stack.mallocLong(1);
                 VkImageViewCreateInfo viewInfo = VkImageViewCreateInfo.callocStack(stack);
                 viewInfo.sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
                 viewInfo.image(swapchainImages[i]);

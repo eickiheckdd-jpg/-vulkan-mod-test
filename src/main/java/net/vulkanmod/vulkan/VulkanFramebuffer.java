@@ -30,7 +30,7 @@ public class VulkanFramebuffer {
                 createInfo.height(VulkanSwapchain.getHeight());
                 createInfo.layers(1);
 
-                PointerBuffer pFramebuffer = stack.mallocPointer(1);
+                LongBuffer pFramebuffer = stack.mallocLong(1);
                 int result = vkCreateFramebuffer(VulkanDevice.getDevice(), createInfo, null, pFramebuffer);
                 if (result != VK_SUCCESS) {
                     throw new RuntimeException("Failed to create framebuffer: " + result);
