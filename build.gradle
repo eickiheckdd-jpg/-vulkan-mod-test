@@ -1,14 +1,11 @@
 buildscript {
     repositories {
-        flatDir {
-            dirs '/tmp', 'lib'
-        }
+        maven { url "https://maven.fabricmc.net/" }
         mavenCentral()
         gradlePluginPortal()
     }
     dependencies {
-        classpath name: 'fabric-loom-1.14.10', ext: 'jar'
-        classpath name: 'gson-2.10.1', ext: 'jar'
+        classpath 'net.fabricmc:fabric-loom:1.14.10'
     }
 }
 
@@ -23,6 +20,7 @@ base {
 }
 
 repositories {
+    maven { url "https://maven.fabricmc.net/" }
     mavenCentral()
     gradlePluginPortal()
 }
