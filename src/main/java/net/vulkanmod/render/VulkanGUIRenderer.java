@@ -337,6 +337,11 @@ public class VulkanGUIRenderer {
         guiQueue.addLast(cmd);
     }
 
+    public static void processQueue() {
+        if (!initialized || guiQueue.isEmpty()) return;
+        uploadAndRender(NULL);
+    }
+
     public static void uploadAndRender(long commandBuffer) {
         if (!initialized || guiQueue.isEmpty()) return;
 

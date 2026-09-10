@@ -193,6 +193,11 @@ public class VulkanChunkMeshBatcher {
         meshQueue.addLast(mesh);
     }
 
+    public static void processQueue() {
+        if (!initialized || meshQueue.isEmpty()) return;
+        uploadAndRender(NULL);
+    }
+
     public static void uploadAndRender(long commandBuffer) {
         if (!initialized || meshQueue.isEmpty()) return;
 

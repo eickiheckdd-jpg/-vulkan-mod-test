@@ -279,6 +279,11 @@ public class VulkanParticleRenderer {
         }
     }
 
+    public static void processQueue() {
+        if (!initialized || particleQueue.isEmpty()) return;
+        uploadAndRender(NULL);
+    }
+
     public static void uploadAndRender(long commandBuffer) {
         if (!initialized || particleQueue.isEmpty()) return;
 

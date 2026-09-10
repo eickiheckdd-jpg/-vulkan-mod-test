@@ -275,6 +275,11 @@ public class VulkanEntityRenderer {
         entityQueue.addLast(mesh);
     }
 
+    public static void processQueue() {
+        if (!initialized || entityQueue.isEmpty()) return;
+        uploadAndRender(NULL);
+    }
+
     public static void uploadAndRender(long commandBuffer) {
         if (!initialized || entityQueue.isEmpty()) return;
 
