@@ -149,17 +149,19 @@ public class VulkanRenderer {
             int imageIndex = pImageIndex.get(0);
 
             boolean hasCapture = false;
-            int fbWidth = VulkanTextureCapture.getViewportWidth();
-            int fbHeight = VulkanTextureCapture.getViewportHeight();
-            if (fbWidth > 0 && fbHeight > 0) {
-                ByteBuffer pixelData = VulkanTextureCapture.captureFramebuffer(fbWidth, fbHeight);
-                if (pixelData != null && VulkanFullscreenQuad.isInitialized()) {
-                    VulkanFullscreenQuad.updateTexture(pixelData, fbWidth, fbHeight);
-                    if (VulkanPipeline.getDescriptorSet() != NULL && VulkanFullscreenQuad.getCapturedImageView() != NULL) {
-                        VulkanPipeline.updateTexture(VulkanFullscreenQuad.getCapturedImageView());
+            if (!VulkanModConfig.getConfig().enableFrameReplacement) {
+                int fbWidth = VulkanTextureCapture.getViewportWidth();
+                int fbHeight = VulkanTextureCapture.getViewportHeight();
+                if (fbWidth > 0 && fbHeight > 0) {
+                    ByteBuffer pixelData = VulkanTextureCapture.captureFramebuffer(fbWidth, fbHeight);
+                    if (pixelData != null && VulkanFullscreenQuad.isInitialized()) {
+                        VulkanFullscreenQuad.updateTexture(pixelData, fbWidth, fbHeight);
+                        if (VulkanPipeline.getDescriptorSet() != NULL && VulkanFullscreenQuad.getCapturedImageView() != NULL) {
+                            VulkanPipeline.updateTexture(VulkanFullscreenQuad.getCapturedImageView());
+                        }
+                        MemoryUtil.memFree(pixelData);
+                        hasCapture = true;
                     }
-                    MemoryUtil.memFree(pixelData);
-                    hasCapture = true;
                 }
             }
 
