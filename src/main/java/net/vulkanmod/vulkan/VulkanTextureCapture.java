@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import net.vulkanmod.vulkan.MinecraftInstance;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -14,6 +15,12 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 public class VulkanTextureCapture {
     public static ByteBuffer captureFramebuffer(int width, int height) {
         try {
+            long windowHandle = MinecraftInstance.getWindowHandle();
+            if (windowHandle == MemoryUtil.NULL) {
+                VulkanMod.LOGGER.warn("Cannot capture framebuffer: window handle not available");
+                return null;
+            }
+
             GL.createCapabilities();
 
             int pixelCount = width * height;
