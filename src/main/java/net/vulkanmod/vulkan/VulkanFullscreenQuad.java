@@ -463,6 +463,10 @@ public class VulkanFullscreenQuad {
         descriptorSet = pDescriptorSet.get(0);
     }
 
+    public static long getCapturedImageView() {
+        return capturedImageView;
+    }
+
     public static void updateTexture(ByteBuffer pixelData, int width, int height) {
         if (capturedImage == NULL || pixelData == null) return;
 

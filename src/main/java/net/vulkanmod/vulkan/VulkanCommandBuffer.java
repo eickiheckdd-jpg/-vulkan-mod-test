@@ -1,6 +1,10 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import net.vulkanmod.render.VulkanChunkMeshBatcher;
+import net.vulkanmod.render.VulkanIndirectDrawSystem;
+import net.vulkanmod.vulkan.VulkanVertexCapture;
+import net.vulkanmod.vulkan.VulkanDevice;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -72,32 +76,22 @@ public class VulkanCommandBuffer {
             renderPassInfo.framebuffer(VulkanFramebuffer.getFramebuffers()[imageIndex]);
             renderPassInfo.renderArea(VkRect2D.callocStack(stack).offset(VkOffset2D.callocStack(stack).x(0).y(0))
                 .extent(VkExtent2D.callocStack(stack).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight())));
-            VkClearValue.Buffer clearValues = VkClearValue.callocStack(1, stack);
-            VkClearValue clearValue = clearValues.get(0);
-            VkClearColorValue clearColor = VkClearColorValue.callocStack(stack);
-            clearColor.float32(stack.floats(0.1f, 0.1f, 0.1f, 1.0f));
-            clearValue.color(clearColor);
+            VkClearValue.Buffer clearValues = VkClearValue.callocStack(2, stack);
+            VkClearValue clearColor = clearValues.get(0);
+            VkClearColorValue clearColorValue = VkClearColorValue.callocStack(stack);
+            clearColorValue.float32(stack.floats(0.1f, 0.1f, 0.1f, 1.0f));
+            clearColor.color(clearColorValue);
+
+            VkClearValue clearDepth = clearValues.get(1);
+            VkClearDepthStencilValue clearDepthValue = VkClearDepthStencilValue.callocStack(stack);
+            clearDepthValue.depth(1.0f);
+            clearDepthValue.stencil(0);
+            clearDepth.depthStencil(clearDepthValue);
             renderPassInfo.pClearValues(clearValues);
 
             vkCmdBeginRenderPass(commandBuffer, renderPassInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
-            VkViewport.Buffer viewport = VkViewport.callocStack(1, stack);
-            viewport.x(0).y(0).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight())
-                .minDepth(0.0f).maxDepth(1.0f);
-            vkCmdSetViewport(commandBuffer, 0, viewport);
-
-            VkRect2D.Buffer scissor = VkRect2D.callocStack(1, stack);
-            scissor.offset(VkOffset2D.callocStack(stack).x(0).y(0))
-                .extent(VkExtent2D.callocStack(stack).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight()));
-            vkCmdSetScissor(commandBuffer, 0, scissor);
-
-            vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
-
-            if (VulkanFullscreenQuad.isInitialized()) {
-                VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
-            } else {
-                vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-            }
+            recordDrawCommands(commandBuffer, stack, imageIndex);
 
             vkCmdEndRenderPass(commandBuffer);
 
@@ -105,6 +99,49 @@ public class VulkanCommandBuffer {
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to end command buffer: " + result);
             }
+        }
+    }
+
+    private static void recordDrawCommands(VkCommandBuffer commandBuffer, MemoryStack stack, int imageIndex) {
+        VkViewport.Buffer viewport = VkViewport.callocStack(1, stack);
+        viewport.x(0).y(0).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight())
+            .minDepth(0.0f).maxDepth(1.0f);
+        vkCmdSetViewport(commandBuffer, 0, viewport);
+
+        VkRect2D.Buffer scissor = VkRect2D.callocStack(1, stack);
+        scissor.offset(VkOffset2D.callocStack(stack).x(0).y(0))
+            .extent(VkExtent2D.callocStack(stack).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight()));
+        vkCmdSetScissor(commandBuffer, 0, scissor);
+
+        vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
+
+        vkCmdPushConstants(commandBuffer, VulkanPipeline.getPipelineLayout(), VK10.VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        ).flip());
+
+        if (VulkanPipeline.getDescriptorSet() != NULL) {
+            vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
+        }
+
+        if (VulkanFullscreenQuad.isInitialized()) {
+            VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+        } else {
+            vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        }
+
+        if (VulkanVertexCapture.isInitialized()) {
+            VulkanVertexCapture.uploadAndRender(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+        }
+
+        if (VulkanChunkMeshBatcher.isInitialized()) {
+            VulkanChunkMeshBatcher.uploadAndRender(commandBuffers[imageIndex]);
+        }
+
+        if (VulkanIndirectDrawSystem.isInitialized()) {
+            VulkanIndirectDrawSystem.executeIndirectDraw(commandBuffers[imageIndex]);
         }
     }
 

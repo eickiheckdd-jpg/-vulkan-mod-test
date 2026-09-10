@@ -2,6 +2,7 @@ package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
+import net.vulkanmod.vulkan.VulkanPipeline;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -306,8 +307,15 @@ public class VulkanEntityRenderer {
             }
 
             VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
-            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
             vkCmdBindVertexBuffers(cmdBuf, 0, stack.longs(vertexBuffer), stack.longs(0));
+
+            vkCmdPushConstants(cmdBuf, VulkanPipeline.getPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 1.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+            ).flip());
 
             long offset = 0;
             for (EntityMesh mesh : entityQueue) {

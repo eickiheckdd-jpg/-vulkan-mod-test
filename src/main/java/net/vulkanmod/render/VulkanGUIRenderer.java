@@ -2,6 +2,7 @@ package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
+import net.vulkanmod.vulkan.VulkanPipeline;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -368,7 +369,7 @@ public class VulkanGUIRenderer {
 
                 VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
                 vkCmdCopyBuffer(cmdBuf, stagingBuffer, vertexBuffer, copyRegion);
-                vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
                 vkCmdBindVertexBuffers(cmdBuf, 0, stack.longs(vertexBuffer), stack.longs(0));
                 vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
                 vkCmdDrawIndexed(cmdBuf, totalIndices, 1, 0, 0, 0);

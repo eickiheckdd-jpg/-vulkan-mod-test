@@ -13,10 +13,14 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanRenderPass {
     private static long renderPass;
+    private static int depthFormat;
 
     public static void create() {
         try (MemoryStack stack = stackPush()) {
-            VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.callocStack(1, stack);
+            depthFormat = findDepthFormat();
+
+            VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.callocStack(2, stack);
+
             VkAttachmentDescription colorAttachment = attachments.get(0);
             colorAttachment.format(VulkanSwapchain.getImageFormat());
             colorAttachment.samples(VK10.VK_SAMPLE_COUNT_1_BIT);
@@ -27,25 +31,41 @@ public class VulkanRenderPass {
             colorAttachment.initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
             colorAttachment.finalLayout(KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
+            VkAttachmentDescription depthAttachment = attachments.get(1);
+            depthAttachment.format(depthFormat);
+            depthAttachment.samples(VK10.VK_SAMPLE_COUNT_1_BIT);
+            depthAttachment.loadOp(VK10.VK_ATTACHMENT_LOAD_OP_CLEAR);
+            depthAttachment.storeOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE);
+            depthAttachment.stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE);
+            depthAttachment.stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE);
+            depthAttachment.initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+            depthAttachment.finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
             VkAttachmentReference.Buffer colorAttachments = VkAttachmentReference.callocStack(1, stack);
             VkAttachmentReference colorAttachmentRef = colorAttachments.get(0);
             colorAttachmentRef.attachment(0);
             colorAttachmentRef.layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            VkAttachmentReference.Buffer depthAttachmentRefs = VkAttachmentReference.callocStack(1, stack);
+            VkAttachmentReference depthAttachmentRef = depthAttachmentRefs.get(0);
+            depthAttachmentRef.attachment(1);
+            depthAttachmentRef.layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
             VkSubpassDescription.Buffer subpasses = VkSubpassDescription.callocStack(1, stack);
             VkSubpassDescription subpass = subpasses.get(0);
             subpass.pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS);
             subpass.colorAttachmentCount(1);
             subpass.pColorAttachments(colorAttachments);
+            subpass.pDepthStencilAttachment(depthAttachmentRef);
 
             VkSubpassDependency.Buffer dependencies = VkSubpassDependency.callocStack(1, stack);
             VkSubpassDependency dependency = dependencies.get(0);
             dependency.srcSubpass(VK10.VK_SUBPASS_EXTERNAL);
             dependency.dstSubpass(0);
-            dependency.srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-            dependency.dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+            dependency.srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+            dependency.dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
             dependency.srcAccessMask(0);
-            dependency.dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+            dependency.dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
             VkRenderPassCreateInfo createInfo = VkRenderPassCreateInfo.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
@@ -60,12 +80,36 @@ public class VulkanRenderPass {
             }
             renderPass = pRenderPass.get(0);
 
-            VulkanMod.LOGGER.info("Render pass created successfully");
+            VulkanMod.LOGGER.info("Render pass created with depth attachment");
         }
+    }
+
+    private static int findDepthFormat() {
+        int[] candidates = {
+            VK10.VK_FORMAT_D32_SFLOAT,
+            VK10.VK_FORMAT_D32_SFLOAT_S8_UINT,
+            VK10.VK_FORMAT_D24_UNORM_S8_UINT,
+            VK10.VK_FORMAT_D16_UNORM_S8_UINT,
+            VK10.VK_FORMAT_D16_UNORM
+        };
+
+        for (int format : candidates) {
+            VkFormatProperties props = VkFormatProperties.callocStack();
+            vkGetPhysicalDeviceFormatProperties(VulkanInstance.getPhysicalDevice(), format, props);
+            if ((props.optimalTilingFeatures() & VK10.VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
+                return format;
+            }
+        }
+
+        return VK10.VK_FORMAT_D16_UNORM;
     }
 
     public static long getRenderPass() {
         return renderPass;
+    }
+
+    public static int getDepthFormat() {
+        return depthFormat;
     }
 
     public static void cleanup() {

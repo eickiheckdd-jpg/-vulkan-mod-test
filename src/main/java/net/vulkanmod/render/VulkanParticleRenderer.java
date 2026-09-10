@@ -2,6 +2,7 @@ package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
+import net.vulkanmod.vulkan.VulkanPipeline;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -339,8 +340,7 @@ public class VulkanParticleRenderer {
             copy.size(totalSize);
 
             VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
-            vkCmdCopyBuffer(cmdBuf, stagingBuffer, vertexBuffer, copyRegion);
-            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
             vkCmdBindVertexBuffers(cmdBuf, 0, stack.longs(vertexBuffer), stack.longs(0));
             vkCmdDraw(cmdBuf, particleCount * 4, 1, 0, 0);
         }

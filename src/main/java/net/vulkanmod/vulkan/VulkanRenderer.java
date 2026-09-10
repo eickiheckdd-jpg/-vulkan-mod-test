@@ -146,26 +146,16 @@ public class VulkanRenderer {
                 ByteBuffer pixelData = VulkanTextureCapture.captureFramebuffer(fbWidth, fbHeight);
                 if (pixelData != null && VulkanFullscreenQuad.isInitialized()) {
                     VulkanFullscreenQuad.updateTexture(pixelData, fbWidth, fbHeight);
+                    if (VulkanPipeline.getDescriptorSet() != NULL && VulkanFullscreenQuad.getCapturedImageView() != NULL) {
+                        VulkanPipeline.updateTexture(VulkanFullscreenQuad.getCapturedImageView());
+                    }
                     MemoryUtil.memFree(pixelData);
                 }
             }
 
             VulkanCommandBuffer.recordCommandBuffer(imageIndex);
 
-            if (VulkanVertexCapture.isInitialized()) {
-                VulkanVertexCapture.uploadAndRender(VulkanCommandBuffer.getCommandBuffers()[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
-            }
-
-            if (VulkanChunkMeshBatcher.isInitialized()) {
-                VulkanChunkMeshBatcher.uploadAndRender(VulkanCommandBuffer.getCommandBuffers()[imageIndex]);
-            }
-
-            if (VulkanIndirectDrawSystem.isInitialized()) {
-                VulkanIndirectDrawSystem.executeIndirectDraw(VulkanCommandBuffer.getCommandBuffers()[imageIndex]);
-            }
-
             VulkanTextureStreamer.processTextureQueue();
-            VulkanMultiThreadedRenderer.waitForRenderThread();
 
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);

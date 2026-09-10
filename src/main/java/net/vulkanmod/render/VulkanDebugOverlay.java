@@ -2,6 +2,7 @@ package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
+import net.vulkanmod.vulkan.VulkanPipeline;
 import net.vulkanmod.vulkan.VulkanRenderPass;
 import net.vulkanmod.vulkan.VulkanSwapchain;
 import org.lwjgl.PointerBuffer;
@@ -393,7 +394,7 @@ public class VulkanDebugOverlay {
 
             VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
             vkCmdCopyBuffer(cmdBuf, stagingBuffer, vertexBuffer, copyRegion);
-            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
             vkCmdBindVertexBuffers(cmdBuf, 0, stack.longs(vertexBuffer), stack.longs(0));
             vkCmdDraw(cmdBuf, totalVertices, 1, 0, 0);
         }

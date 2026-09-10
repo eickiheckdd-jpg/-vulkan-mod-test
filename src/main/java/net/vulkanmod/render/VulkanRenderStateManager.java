@@ -2,6 +2,8 @@ package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
+import net.vulkanmod.vulkan.VulkanPipeline;
+import net.vulkanmod.vulkan.VulkanRenderPass;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
@@ -131,31 +133,85 @@ public class VulkanRenderStateManager {
     }
 
     private static void createDefaultPipelines(MemoryStack stack) {
+        ByteBuffer vertShader = VulkanPipeline.loadShader("shaders/terrain.vert.spv");
+        ByteBuffer fragShader = VulkanPipeline.loadShader("shaders/terrain.frag.spv");
+        if (vertShader == null || fragShader == null) {
+            VulkanMod.LOGGER.warn("Failed to load shaders for render state manager");
+            return;
+        }
+
+        LongBuffer pVertModule = stack.mallocLong(1);
+        VkShaderModuleCreateInfo vertInfo = VkShaderModuleCreateInfo.callocStack(stack);
+        vertInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
+        vertInfo.pCode(vertShader);
+        vkCreateShaderModule(VulkanDevice.getDevice(), vertInfo, null, pVertModule);
+        long vertModule = pVertModule.get(0);
+
+        LongBuffer pFragModule = stack.mallocLong(1);
+        VkShaderModuleCreateInfo fragInfo = VkShaderModuleCreateInfo.callocStack(stack);
+        fragInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
+        fragInfo.pCode(fragShader);
+        vkCreateShaderModule(VulkanDevice.getDevice(), fragInfo, null, pFragModule);
+        long fragModule = pFragModule.get(0);
+
         // Opaque pipeline
-        createPipeline(stack, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_BACK_BIT, 0, true, true);
+        createPipeline(stack, vertModule, fragModule, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_BACK_BIT, 0, true, true);
         // Alpha tested pipeline
-        createPipeline(stack, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_BACK_BIT, 1, true, true);
+        createPipeline(stack, vertModule, fragModule, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_BACK_BIT, 1, true, true);
         // Translucent pipeline
-        createPipeline(stack, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_NONE, 2, true, false);
+        createPipeline(stack, vertModule, fragModule, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_CULL_MODE_NONE, 2, true, false);
+
+        vkDestroyShaderModule(VulkanDevice.getDevice(), vertModule, null);
+        vkDestroyShaderModule(VulkanDevice.getDevice(), fragModule, null);
+        MemoryUtil.memFree(vertShader);
+        MemoryUtil.memFree(fragShader);
     }
 
-    private static void createPipeline(MemoryStack stack, int topology, int cullMode, int blendMode,
+    private static void createPipeline(MemoryStack stack, long vertModule, long fragModule, int topology, int cullMode, int blendMode,
                                        boolean depthTest, boolean depthWrite) {
         VkPipelineShaderStageCreateInfo.Buffer shaderStages = VkPipelineShaderStageCreateInfo.callocStack(2, stack);
         VkPipelineShaderStageCreateInfo vertStage = shaderStages.get(0);
         vertStage.sType(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         vertStage.stage(VK_SHADER_STAGE_VERTEX_BIT);
-        vertStage.module(NULL);
+        vertStage.module(vertModule);
         vertStage.pName(stack.UTF8("main"));
 
         VkPipelineShaderStageCreateInfo fragStage = shaderStages.get(1);
         fragStage.sType(VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         fragStage.stage(VK_SHADER_STAGE_FRAGMENT_BIT);
-        fragStage.module(NULL);
+        fragStage.module(fragModule);
         fragStage.pName(stack.UTF8("main"));
 
         VkPipelineVertexInputStateCreateInfo vertexInput = VkPipelineVertexInputStateCreateInfo.callocStack(stack);
         vertexInput.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
+
+        VkVertexInputBindingDescription.Buffer bindingDescriptions = VkVertexInputBindingDescription.callocStack(1, stack);
+        VkVertexInputBindingDescription bindingDescription = bindingDescriptions.get(0);
+        bindingDescription.binding(0);
+        bindingDescription.stride(4 * 8);
+        bindingDescription.inputRate(VK10.VK_VERTEX_INPUT_RATE_VERTEX);
+        vertexInput.pVertexBindingDescriptions(bindingDescriptions);
+
+        VkVertexInputAttributeDescription.Buffer attributeDescriptions = VkVertexInputAttributeDescription.callocStack(3, stack);
+        VkVertexInputAttributeDescription posAttribute = attributeDescriptions.get(0);
+        posAttribute.binding(0);
+        posAttribute.location(0);
+        posAttribute.format(VK10.VK_FORMAT_R32G32B32_SFLOAT);
+        posAttribute.offset(0);
+
+        VkVertexInputAttributeDescription uvAttribute = attributeDescriptions.get(1);
+        uvAttribute.binding(0);
+        uvAttribute.location(1);
+        uvAttribute.format(VK10.VK_FORMAT_R32G32_SFLOAT);
+        uvAttribute.offset(3 * 4);
+
+        VkVertexInputAttributeDescription colorAttribute = attributeDescriptions.get(2);
+        colorAttribute.binding(0);
+        colorAttribute.location(2);
+        colorAttribute.format(VK10.VK_FORMAT_R32G32B32A32_SFLOAT);
+        colorAttribute.offset(5 * 4);
+
+        vertexInput.pVertexAttributeDescriptions(attributeDescriptions);
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = VkPipelineInputAssemblyStateCreateInfo.callocStack(stack);
         inputAssembly.sType(VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO);
@@ -174,7 +230,7 @@ public class VulkanRenderStateManager {
         rasterizer.polygonMode(VK_POLYGON_MODE_FILL);
         rasterizer.lineWidth(1.0f);
         rasterizer.cullMode(cullMode);
-        rasterizer.frontFace(VK_FRONT_FACE_CLOCKWISE);
+        rasterizer.frontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE);
         rasterizer.depthBiasEnable(false);
 
         VkPipelineMultisampleStateCreateInfo multisampling = VkPipelineMultisampleStateCreateInfo.callocStack(stack);
@@ -230,6 +286,23 @@ public class VulkanRenderStateManager {
         );
         dynamicState.pDynamicStates(pDynamicStates);
 
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.callocStack(stack);
+        pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
+        pipelineLayoutInfo.pSetLayouts(stack.longs(0));
+
+        VkPushConstantRange.Buffer pushConstantRanges = VkPushConstantRange.callocStack(1, stack);
+        VkPushConstantRange pushConstantRange = pushConstantRanges.get(0);
+        pushConstantRange.stageFlags(VK_SHADER_STAGE_VERTEX_BIT);
+        pushConstantRange.offset(0);
+        pushConstantRange.size(64);
+        pipelineLayoutInfo.pPushConstantRanges(pushConstantRanges);
+
+        LongBuffer pPipelineLayout = stack.mallocLong(1);
+        int result = vkCreatePipelineLayout(VulkanDevice.getDevice(), pipelineLayoutInfo, null, pPipelineLayout);
+        if (result != VK_SUCCESS) {
+            throw new RuntimeException("Failed to create render state pipeline layout: " + result);
+        }
+
         VkGraphicsPipelineCreateInfo.Buffer pipelineInfoBuffer = VkGraphicsPipelineCreateInfo.callocStack(1, stack);
         VkGraphicsPipelineCreateInfo pipelineInfo = pipelineInfoBuffer.get(0);
         pipelineInfo.sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
@@ -243,18 +316,20 @@ public class VulkanRenderStateManager {
         pipelineInfo.pDepthStencilState(depthStencil);
         pipelineInfo.pColorBlendState(colorBlending);
         pipelineInfo.pDynamicState(dynamicState);
-        pipelineInfo.layout(pipelineLayout);
-        pipelineInfo.renderPass(VK_NULL_HANDLE);
+        pipelineInfo.layout(pPipelineLayout.get(0));
+        pipelineInfo.renderPass(VulkanRenderPass.getRenderPass());
         pipelineInfo.subpass(0);
         pipelineInfo.basePipelineHandle(NULL);
         pipelineInfo.basePipelineIndex(-1);
 
         LongBuffer pPipeline = stack.mallocLong(1);
-        int result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfoBuffer, null, pPipeline);
+        result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfoBuffer, null, pPipeline);
         if (result == VK_SUCCESS) {
             int index = (topology * 16 + cullMode * 4 + blendMode) % MAX_PIPELINES;
             pipelineCache[index] = pPipeline.get(0);
         }
+
+        vkDestroyPipelineLayout(VulkanDevice.getDevice(), pPipelineLayout.get(0), null);
     }
 
     public static void setTopology(int topology) {
@@ -300,6 +375,9 @@ public class VulkanRenderStateManager {
         if (pipeline != NULL) {
             VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
             vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        } else {
+            VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
+            vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
         }
         currentState.dirty = false;
     }
