@@ -12,6 +12,7 @@ import java.nio.LongBuffer;
 
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
@@ -80,7 +81,7 @@ public class VulkanRenderer {
             fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
-            LongBuffer pSemaphore = stack.mallocLong(1);
+            PointerBuffer pSemaphore = stack.mallocPointer(1);
 
             for (int i = 0; i < imageCount; i++) {
                 int result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
@@ -102,7 +103,7 @@ public class VulkanRenderer {
         }
 
         try (MemoryStack stack = stackPush()) {
-            IntBuffer pImageIndex = stack.mallocInt(1);
+            IntBuffer pImageIndex = stack.ints(0);
             int result = vkAcquireNextImageKHR(
                 VulkanDevice.getDevice(),
                 VulkanSwapchain.getSwapchain(),
@@ -112,11 +113,11 @@ public class VulkanRenderer {
                 pImageIndex
             );
 
-            if (result == VK10.VK_ERROR_OUT_OF_DATE_KHR) {
+            if (result == VK_ERROR_OUT_OF_DATE_KHR) {
                 recreateSwapchain();
                 return;
             }
-            if (result != VK10.VK_SUCCESS && result != VK10.VK_SUBOPTIMAL_KHR) {
+            if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
                 VulkanMod.LOGGER.error("Failed to acquire swapchain image: {}", result);
                 return;
             }
@@ -125,12 +126,18 @@ public class VulkanRenderer {
 
             VulkanCommandBuffer.recordCommandBuffer(imageIndex);
 
-            VkSubmitInfo.Buffer submitInfo = VkSubmitInfo.callocStack(stack);
+            VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-            submitInfo.pWaitSemaphores(stack.longs(imageAvailableSemaphores[frameIndex]));
+            PointerBuffer pWaitSemaphores = stack.mallocPointer(1);
+            pWaitSemaphores.put(0, imageAvailableSemaphores[frameIndex]).flip();
+            submitInfo.pWaitSemaphores(pWaitSemaphores);
             submitInfo.pWaitDstStageMask(stack.ints(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
-            submitInfo.pCommandBuffers(stack.longs(VulkanCommandBuffer.getCommandBuffers()[imageIndex]));
-            submitInfo.pSignalSemaphores(stack.longs(renderFinishedSemaphores[frameIndex]));
+            PointerBuffer pCommandBuffers = stack.mallocPointer(1);
+            pCommandBuffers.put(0, VulkanCommandBuffer.getCommandBuffers()[imageIndex]).flip();
+            submitInfo.pCommandBuffers(pCommandBuffers);
+            PointerBuffer pSignalSemaphores = stack.mallocPointer(1);
+            pSignalSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
+            submitInfo.pSignalSemaphores(pSignalSemaphores);
 
             result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, VK10.VK_NULL_HANDLE);
             if (result != VK_SUCCESS) {
@@ -138,16 +145,20 @@ public class VulkanRenderer {
                 return;
             }
 
-            VkPresentInfoKHR.Buffer presentInfo = VkPresentInfoKHR.callocStack(stack);
+            VkPresentInfoKHR presentInfo = VkPresentInfoKHR.callocStack(stack);
             presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
-            presentInfo.pWaitSemaphores(stack.longs(renderFinishedSemaphores[frameIndex]));
-            presentInfo.pSwapchains(stack.longs(VulkanSwapchain.getSwapchain()));
+            PointerBuffer pPresentWaitSemaphores = stack.mallocPointer(1);
+            pPresentWaitSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
+            presentInfo.pWaitSemaphores(pPresentWaitSemaphores);
+            PointerBuffer pSwapchains = stack.mallocPointer(1);
+            pSwapchains.put(0, VulkanSwapchain.getSwapchain()).flip();
+            presentInfo.pSwapchains(pSwapchains);
             presentInfo.pImageIndices(pImageIndex);
 
             result = vkQueuePresentKHR(VulkanDevice.getPresentQueue(), presentInfo);
-            if (result == VK10.VK_ERROR_OUT_OF_DATE_KHR || result == VK10.VK_SUBOPTIMAL_KHR) {
+            if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
                 recreateSwapchain();
-            } else if (result != VK10.VK_SUCCESS) {
+            } else if (result != VK_SUCCESS) {
                 VulkanMod.LOGGER.error("Failed to present swapchain image: {}", result);
                 return;
             }
@@ -166,17 +177,8 @@ public class VulkanRenderer {
     }
 
     private static void cleanupSwapchainResources() {
-        if (VulkanCommandBuffer.getCommandBuffers() != null) {
-            vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(),
-                VulkanCommandBuffer.getCommandBuffers());
-        }
-        if (VulkanFramebuffer.getFramebuffers() != null) {
-            for (long fb : VulkanFramebuffer.getFramebuffers()) {
-                if (fb != MemoryUtil.NULL) {
-                    vkDestroyFramebuffer(VulkanDevice.getDevice(), fb, null);
-                }
-            }
-        }
+        VulkanCommandBuffer.cleanup();
+        VulkanFramebuffer.cleanup();
     }
 
     private static void logSystemInfo() {

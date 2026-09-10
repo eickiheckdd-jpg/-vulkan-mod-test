@@ -7,7 +7,9 @@ import org.lwjgl.vulkan.*;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.vulkan.VK10.*;
+import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanRenderPass {
     private static long renderPass;
@@ -23,7 +25,7 @@ public class VulkanRenderPass {
             colorAttachment.stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE);
             colorAttachment.stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE);
             colorAttachment.initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
-            colorAttachment.finalLayout(VK10.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            colorAttachment.finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
             VkAttachmentReference.Buffer colorAttachments = VkAttachmentReference.callocStack(1, stack);
             VkAttachmentReference colorAttachmentRef = colorAttachments.get(0);
@@ -45,13 +47,13 @@ public class VulkanRenderPass {
             dependency.srcAccessMask(0);
             dependency.dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-            VkRenderPassCreateInfo.Buffer createInfo = VkRenderPassCreateInfo.callocStack(stack);
+            VkRenderPassCreateInfo createInfo = VkRenderPassCreateInfo.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
             createInfo.pAttachments(attachments);
             createInfo.pSubpasses(subpasses);
             createInfo.pDependencies(dependencies);
 
-            LongBuffer pRenderPass = stack.mallocLong(1);
+            PointerBuffer pRenderPass = stack.mallocPointer(1);
             int result = vkCreateRenderPass(VulkanDevice.getDevice(), createInfo, null, pRenderPass);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create render pass: " + result);

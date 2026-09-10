@@ -12,6 +12,7 @@ import java.nio.LongBuffer;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanPipeline {
     private static long pipeline;
@@ -26,8 +27,8 @@ public class VulkanPipeline {
                 throw new RuntimeException("Failed to load shaders");
             }
 
-            LongBuffer pVertModule = stack.mallocLong(1);
-            VkShaderModuleCreateInfo.Buffer vertInfo = VkShaderModuleCreateInfo.callocStack(stack);
+            PointerBuffer pVertModule = stack.mallocPointer(1);
+            VkShaderModuleCreateInfo vertInfo = VkShaderModuleCreateInfo.callocStack(stack);
             vertInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
             vertInfo.pCode(vertShader);
             int result = vkCreateShaderModule(VulkanDevice.getDevice(), vertInfo, null, pVertModule);
@@ -36,8 +37,8 @@ public class VulkanPipeline {
             }
             long vertModule = pVertModule.get(0);
 
-            LongBuffer pFragModule = stack.mallocLong(1);
-            VkShaderModuleCreateInfo.Buffer fragInfo = VkShaderModuleCreateInfo.callocStack(stack);
+            PointerBuffer pFragModule = stack.mallocPointer(1);
+            VkShaderModuleCreateInfo fragInfo = VkShaderModuleCreateInfo.callocStack(stack);
             fragInfo.sType(VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
             fragInfo.pCode(fragShader);
             result = vkCreateShaderModule(VulkanDevice.getDevice(), fragInfo, null, pFragModule);
@@ -125,7 +126,7 @@ public class VulkanPipeline {
             pipelineLayoutInfo.pSetLayouts(stack.longs(0));
             pipelineLayoutInfo.pushConstantRangeCount(0);
 
-            LongBuffer pPipelineLayout = stack.mallocLong(1);
+            PointerBuffer pPipelineLayout = stack.mallocPointer(1);
             result = vkCreatePipelineLayout(VulkanDevice.getDevice(), pipelineLayoutInfo, null, pPipelineLayout);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create pipeline layout: " + result);
@@ -147,11 +148,11 @@ public class VulkanPipeline {
             pipelineInfo.layout(pipelineLayout);
             pipelineInfo.renderPass(VulkanRenderPass.getRenderPass());
             pipelineInfo.subpass(0);
-            pipelineInfo.basePipelineHandle(MemoryUtil.NULL);
+            pipelineInfo.basePipelineHandle(NULL);
             pipelineInfo.basePipelineIndex(-1);
 
-            LongBuffer pPipeline = stack.mallocLong(1);
-            result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), VK10.VK_NULL_HANDLE, pipelineInfo, null, pPipeline);
+            PointerBuffer pPipeline = stack.mallocPointer(1);
+            result = vkCreateGraphicsPipelines(VulkanDevice.getDevice(), NULL, pipelineInfo, null, pPipeline);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create graphics pipeline: " + result);
             }

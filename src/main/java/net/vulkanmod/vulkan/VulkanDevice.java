@@ -1,7 +1,9 @@
 package net.vulkanmod.vulkan;
 
+import net.vulkanmod.VulkanMod;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.PointerBuffer;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.FloatBuffer;
@@ -9,7 +11,10 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.vulkan.VK10.*;
+import static org.lwjgl.vulkan.VK11.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanDevice {
     private static VkDevice device;
@@ -36,41 +41,43 @@ public class VulkanDevice {
             VkPhysicalDeviceFeatures deviceFeatures = VkPhysicalDeviceFeatures.callocStack(stack);
             deviceFeatures.set(VulkanInstance.getDeviceFeatures());
 
-            VkDeviceCreateInfo.Buffer deviceCreateInfo = VkDeviceCreateInfo.callocStack(stack);
+            VkDeviceCreateInfo deviceCreateInfo = VkDeviceCreateInfo.callocStack(stack);
             deviceCreateInfo.sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
             deviceCreateInfo.pQueueCreateInfos(queueCreateInfos);
             deviceCreateInfo.pEnabledFeatures(deviceFeatures);
 
-            PointerBuffer ppEnabledExtensionNames = stack.pointers(
-                stack.UTF8(VK10.VK_KHR_SWAPCHAIN_EXTENSION_NAME)
-            );
+            PointerBuffer ppEnabledExtensionNames = stack.mallocPointer(1);
+            ByteBuffer swapchainExt = stack.UTF8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+            ppEnabledExtensionNames.put(swapchainExt).flip();
             deviceCreateInfo.ppEnabledExtensionNames(ppEnabledExtensionNames);
 
-            LongBuffer pDevice = stack.mallocLong(1);
+            PointerBuffer pDevice = stack.mallocPointer(1);
             int result = vkCreateDevice(VulkanInstance.getPhysicalDevice(), deviceCreateInfo, null, pDevice);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create logical device: " + result);
             }
-            device = VkDevice.create(pDevice.get(0));
+            device = new VkDevice(pDevice.get(0), VulkanInstance.getPhysicalDevice(), deviceCreateInfo);
 
-            LongBuffer pQueue = stack.mallocLong(1);
+            PointerBuffer pQueue = stack.mallocPointer(1);
             vkGetDeviceQueue(device, VulkanInstance.getGraphicsQueueFamilyIndex(), 0, pQueue);
-            graphicsQueue = VkQueue.create(pQueue.get(0));
+            graphicsQueue = new VkQueue(pQueue.get(0), device);
 
             vkGetDeviceQueue(device, VulkanInstance.getPresentQueueFamilyIndex(), 0, pQueue);
-            presentQueue = VkQueue.create(pQueue.get(0));
+            presentQueue = new VkQueue(pQueue.get(0), device);
 
             VkCommandPoolCreateInfo poolInfo = VkCommandPoolCreateInfo.callocStack(stack);
             poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO);
             poolInfo.queueFamilyIndex(VulkanInstance.getGraphicsQueueFamilyIndex());
             poolInfo.flags(VK10.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-            LongBuffer pCommandPool = stack.mallocLong(1);
+            PointerBuffer pCommandPool = stack.mallocPointer(1);
             result = vkCreateCommandPool(device, poolInfo, null, pCommandPool);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create command pool: " + result);
             }
             commandPool = pCommandPool.get(0);
+
+            VulkanMod.LOGGER.info("Logical device created successfully");
         }
     }
 

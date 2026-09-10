@@ -10,9 +10,12 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.glfw.GLFWVulkan.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
+import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanSwapchain {
     private static long surface;
@@ -26,7 +29,7 @@ public class VulkanSwapchain {
     public static void create(long window) {
         try (MemoryStack stack = stackPush()) {
             if (surface == MemoryUtil.NULL) {
-                LongBuffer pSurface = stack.mallocLong(1);
+                PointerBuffer pSurface = stack.mallocPointer(1);
                 int result = glfwCreateWindowSurface(VulkanInstance.getInstance(), window, null, pSurface);
                 if (result != VK_SUCCESS) {
                     throw new RuntimeException("Failed to create window surface: " + result);
@@ -58,7 +61,7 @@ public class VulkanSwapchain {
             width = extent.width();
             height = extent.height();
 
-            VkSwapchainCreateInfoKHR.Buffer createInfo = VkSwapchainCreateInfoKHR.callocStack(stack);
+            VkSwapchainCreateInfoKHR createInfo = VkSwapchainCreateInfoKHR.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
             createInfo.surface(surface);
             createInfo.minImageCount(desiredImageCount);
@@ -68,13 +71,13 @@ public class VulkanSwapchain {
             createInfo.imageArrayLayers(1);
             createInfo.imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
             createInfo.imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
-            createInfo.preTransform(VK10.VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
-            createInfo.compositeAlpha(VK10.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
-            createInfo.presentMode(VK10.VK_PRESENT_MODE_FIFO_KHR);
+            createInfo.preTransform(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+            createInfo.compositeAlpha(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
+            createInfo.presentMode(VK_PRESENT_MODE_FIFO_KHR);
             createInfo.clipped(true);
             createInfo.oldSwapchain(VK10.VK_NULL_HANDLE);
 
-            LongBuffer pSwapchain = stack.mallocLong(1);
+            PointerBuffer pSwapchain = stack.mallocPointer(1);
             int result = vkCreateSwapchainKHR(VulkanDevice.getDevice(), createInfo, null, pSwapchain);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create swapchain: " + result);
@@ -84,7 +87,7 @@ public class VulkanSwapchain {
             IntBuffer pImageCount = stack.ints(0);
             vkGetSwapchainImagesKHR(VulkanDevice.getDevice(), swapchain, pImageCount, null);
             swapchainImages = new long[pImageCount.get(0)];
-            LongBuffer pImages = stack.mallocLong(pImageCount.get(0));
+            PointerBuffer pImages = stack.mallocPointer(pImageCount.get(0));
             vkGetSwapchainImagesKHR(VulkanDevice.getDevice(), swapchain, pImageCount, pImages);
             for (int i = 0; i < swapchainImages.length; i++) {
                 swapchainImages[i] = pImages.get(i);
@@ -92,8 +95,8 @@ public class VulkanSwapchain {
 
             imageViews = new long[swapchainImages.length];
             for (int i = 0; i < swapchainImages.length; i++) {
-                LongBuffer pImageView = stack.mallocLong(1);
-                VkImageViewCreateInfo.Buffer viewInfo = VkImageViewCreateInfo.callocStack(stack);
+                PointerBuffer pImageView = stack.mallocPointer(1);
+                VkImageViewCreateInfo viewInfo = VkImageViewCreateInfo.callocStack(stack);
                 viewInfo.sType(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
                 viewInfo.image(swapchainImages[i]);
                 viewInfo.viewType(VK10.VK_IMAGE_VIEW_TYPE_2D);

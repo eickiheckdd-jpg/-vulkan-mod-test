@@ -2,6 +2,7 @@ package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
@@ -12,6 +13,7 @@ import java.nio.LongBuffer;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanCommandBuffer {
     private static long[] commandBuffers;
@@ -22,13 +24,13 @@ public class VulkanCommandBuffer {
             int imageCount = VulkanSwapchain.getSwapchainImages().length;
             commandBuffers = new long[imageCount];
 
-            VkCommandBufferAllocateInfo.Buffer allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
+            VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
             allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
             allocInfo.commandPool(VulkanDevice.getCommandPool());
             allocInfo.level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             allocInfo.commandBufferCount(imageCount);
 
-            LongBuffer pCommandBuffers = stack.mallocLong(imageCount);
+            PointerBuffer pCommandBuffers = stack.mallocPointer(imageCount);
             int result = vkAllocateCommandBuffers(VulkanDevice.getDevice(), allocInfo, pCommandBuffers);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to allocate command buffers: " + result);
@@ -37,11 +39,11 @@ public class VulkanCommandBuffer {
                 commandBuffers[i] = pCommandBuffers.get(i);
             }
 
-            VkFenceCreateInfo.Buffer fenceInfo = VkFenceCreateInfo.callocStack(stack);
+            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.callocStack(stack);
             fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
-            LongBuffer pFence = stack.mallocLong(1);
+            PointerBuffer pFence = stack.mallocPointer(1);
             result = vkCreateFence(VulkanDevice.getDevice(), fenceInfo, null, pFence);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create fence: " + result);
@@ -54,9 +56,9 @@ public class VulkanCommandBuffer {
 
     public static void recordCommandBuffer(int imageIndex) {
         try (MemoryStack stack = stackPush()) {
-            long commandBuffer = commandBuffers[imageIndex];
+            VkCommandBuffer commandBuffer = VkCommandBuffer.create(commandBuffers[imageIndex], VulkanDevice.getDevice());
 
-            VkCommandBufferBeginInfo.Buffer beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
+            VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
             beginInfo.flags(0);
 
@@ -65,7 +67,7 @@ public class VulkanCommandBuffer {
                 throw new RuntimeException("Failed to begin recording command buffer: " + result);
             }
 
-            VkRenderPassBeginInfo.Buffer renderPassInfo = VkRenderPassBeginInfo.callocStack(stack);
+            VkRenderPassBeginInfo renderPassInfo = VkRenderPassBeginInfo.callocStack(stack);
             renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
             renderPassInfo.renderPass(VulkanRenderPass.getRenderPass());
             renderPassInfo.framebuffer(VulkanFramebuffer.getFramebuffers()[imageIndex]);
@@ -111,10 +113,18 @@ public class VulkanCommandBuffer {
 
     public static void cleanup() {
         if (commandBuffers != null) {
-            vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(), commandBuffers);
+            PointerBuffer pCommandBuffers = MemoryUtil.memAllocPointer(commandBuffers.length);
+            for (int i = 0; i < commandBuffers.length; i++) {
+                pCommandBuffers.put(i, commandBuffers[i]);
+            }
+            pCommandBuffers.flip();
+            vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(), pCommandBuffers);
+            MemoryUtil.memFree(pCommandBuffers);
+            commandBuffers = null;
         }
         if (fence != VK10.VK_NULL_HANDLE) {
             vkDestroyFence(VulkanDevice.getDevice(), fence, null);
+            fence = VK10.VK_NULL_HANDLE;
         }
     }
 }

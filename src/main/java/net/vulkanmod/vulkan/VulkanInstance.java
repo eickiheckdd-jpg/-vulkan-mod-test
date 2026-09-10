@@ -1,7 +1,9 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
@@ -11,6 +13,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
+import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
@@ -18,12 +22,12 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanInstance {
     public static final String[] REQUIRED_INSTANCE_EXTENSIONS = {
-        VK10.VK_KHR_SURFACE_EXTENSION_NAME,
-        VK10.VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
     };
 
     public static final String[] REQUIRED_DEVICE_EXTENSIONS = {
-        VK10.VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
     private static VkInstance instance;
@@ -67,12 +71,12 @@ public class VulkanInstance {
             appInfo.engineVersion(VK_MAKE_VERSION(1, 0, 0));
             appInfo.apiVersion(VK11.VK_MAKE_VERSION(1, 1, 0));
 
-            VkInstanceCreateInfo.Buffer createInfo = VkInstanceCreateInfo.callocStack(stack);
+            VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
             createInfo.pApplicationInfo(appInfo);
 
             if (debugUtilsAvailable) {
-                VkDebugUtilsMessengerCreateInfoEXT.Buffer debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
+                VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
                 debugCreateInfo.sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT);
                 debugCreateInfo.flags(0);
                 debugCreateInfo.messageSeverity(VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -80,7 +84,17 @@ public class VulkanInstance {
                 debugCreateInfo.messageType(VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT);
-                debugCreateInfo.pfnUserCallback(VulkanInstance::debugCallback);
+                debugCreateInfo.pfnUserCallback((messageSeverity, messageTypes, pCallbackData, pUserData) -> {
+                    String message = VkDebugUtilsMessengerCallbackDataEXT.create(pCallbackData).pMessageString();
+                    if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
+                        VulkanMod.LOGGER.error("[VK VALIDATION] {}", message);
+                    } else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
+                        VulkanMod.LOGGER.warn("[VK VALIDATION] {}", message);
+                    } else {
+                        VulkanMod.LOGGER.debug("[VK VALIDATION] {}", message);
+                    }
+                    return VK10.VK_FALSE;
+                });
 
                 createInfo.pNext(debugCreateInfo.address());
                 VulkanMod.LOGGER.info("VK_EXT_debug_utils is available. Validation messenger will be created.");
@@ -88,16 +102,16 @@ public class VulkanInstance {
                 VulkanMod.LOGGER.warn("VK_EXT_debug_utils is NOT available. No Vulkan validation debugging.");
             }
 
-            LongBuffer pInstance = stack.mallocLong(1);
+            PointerBuffer pInstance = stack.mallocPointer(1);
             int result = vkCreateInstance(createInfo, null, pInstance);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create Vulkan instance: " + result);
             }
-            instance = VkInstance.create(pInstance.get(0));
+            instance = new VkInstance(pInstance.get(0), createInfo);
 
             if (debugUtilsAvailable) {
-                LongBuffer pMessenger = stack.mallocLong(1);
-                VkDebugUtilsMessengerCreateInfoEXT.Buffer debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
+                PointerBuffer pMessenger = stack.mallocPointer(1);
+                VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
                 debugCreateInfo.sType(VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT);
                 debugCreateInfo.flags(0);
                 debugCreateInfo.messageSeverity(VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -105,7 +119,17 @@ public class VulkanInstance {
                 debugCreateInfo.messageType(VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                     VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT);
-                debugCreateInfo.pfnUserCallback(VulkanInstance::debugCallback);
+                debugCreateInfo.pfnUserCallback((messageSeverity, messageTypes, pCallbackData, pUserData) -> {
+                    String message = VkDebugUtilsMessengerCallbackDataEXT.create(pCallbackData).pMessageString();
+                    if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
+                        VulkanMod.LOGGER.error("[VK VALIDATION] {}", message);
+                    } else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
+                        VulkanMod.LOGGER.warn("[VK VALIDATION] {}", message);
+                    } else {
+                        VulkanMod.LOGGER.debug("[VK VALIDATION] {}", message);
+                    }
+                    return VK10.VK_FALSE;
+                });
 
                 result = vkCreateDebugUtilsMessengerEXT(instance, debugCreateInfo, null, pMessenger);
                 if (result == VK_SUCCESS) {
@@ -118,18 +142,6 @@ public class VulkanInstance {
         }
     }
 
-    private static int debugCallback(int messageSeverity, int messageTypes, ByteBuffer pMessageData, ByteBuffer pUserData) {
-        String message = pMessageData.getStringUTF8();
-        if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
-            VulkanMod.LOGGER.error("[VK VALIDATION] {}", message);
-        } else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
-            VulkanMod.LOGGER.warn("[VK VALIDATION] {}", message);
-        } else {
-            VulkanMod.LOGGER.debug("[VK VALIDATION] {}", message);
-        }
-        return VK10.VK_FALSE;
-    }
-
     public static void selectPhysicalDevice() {
         try (MemoryStack stack = stackPush()) {
             IntBuffer pDeviceCount = stack.ints(0);
@@ -138,10 +150,10 @@ public class VulkanInstance {
                 throw new RuntimeException("No Vulkan physical devices found");
             }
 
-            LongBuffer pDevices = stack.mallocLong(pDeviceCount.get(0));
+            PointerBuffer pDevices = stack.mallocPointer(pDeviceCount.get(0));
             vkEnumeratePhysicalDevices(instance, pDeviceCount, pDevices);
 
-            physicalDevice = VkPhysicalDevice.create(pDevices.get(0));
+            physicalDevice = new VkPhysicalDevice(pDevices.get(0), instance);
             if (physicalDevice == null || physicalDevice.address() == NULL) {
                 throw new RuntimeException("Failed to select physical device");
             }
