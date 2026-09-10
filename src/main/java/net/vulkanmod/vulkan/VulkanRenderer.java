@@ -86,7 +86,6 @@ public class VulkanRenderer {
         } catch (Exception e) {
             state = State.ERROR;
             VulkanMod.LOGGER.error("Failed to initialize Vulkan renderer: {}", e.getMessage());
-            throw e;
         }
     }
 
