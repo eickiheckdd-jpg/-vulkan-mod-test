@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ParticleManager.class)
 public class ParticleEngineMixin {
-    @Inject(method = "render", at = @At("TAIL"))
+    @Inject(method = "addToBatch", at = @At("TAIL"))
     private void onRender(CallbackInfo ci) {
         if (VulkanParticleRenderer.isInitialized()) {
             VulkanParticleRenderer.processQueue();
