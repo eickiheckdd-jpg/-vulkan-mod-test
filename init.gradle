@@ -1,0 +1,34 @@
+allprojects {
+    repositories {
+        maven {
+            url "http://maven.fabricmc.net/"
+            allowInsecureProtocol = true
+            content {
+                includeGroup "net.fabricmc"
+            }
+        }
+        mavenCentral()
+    }
+}
+
+buildscript {
+    repositories {
+        maven {
+            url "http://maven.fabricmc.net/"
+            allowInsecureProtocol = true
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+gradle.settingsEvaluated { settings ->
+    settings.pluginManagement.repositories {
+        maven {
+            url "http://maven.fabricmc.net/"
+            allowInsecureProtocol = true
+        }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
