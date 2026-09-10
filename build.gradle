@@ -37,8 +37,9 @@ dependencies {
     compileOnly "org.lwjgl:lwjgl-vulkan:3.3.1"
     runtimeOnly "org.lwjgl:lwjgl-vulkan:3.3.1"
 
-    // Mixin annotation processor
-    annotationProcessor "org.spongepowered:mixin:0.8.5"
+    // Mixin compile/runtime dependency (matches Fabric Loom's bundled version)
+    modCompileOnly "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
+    annotationProcessor "net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7"
 }
 
 tasks.withType(JavaCompile).configureEach {
