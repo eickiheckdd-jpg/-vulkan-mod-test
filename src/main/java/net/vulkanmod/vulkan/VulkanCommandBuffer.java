@@ -58,7 +58,7 @@ public class VulkanCommandBuffer {
         }
     }
 
-    public static void recordCommandBuffer(int imageIndex) {
+    public static void recordCommandBuffer(int imageIndex, boolean hasCapturedTexture) {
         try (MemoryStack stack = stackPush()) {
             VkCommandBuffer commandBuffer = new VkCommandBuffer(commandBuffers[imageIndex], VulkanDevice.getDevice());
 
@@ -92,7 +92,7 @@ public class VulkanCommandBuffer {
 
             vkCmdBeginRenderPass(commandBuffer, renderPassInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
-            recordDrawCommands(commandBuffer, stack, imageIndex);
+            recordDrawCommands(commandBuffer, stack, imageIndex, hasCapturedTexture);
 
             vkCmdEndRenderPass(commandBuffer);
 
@@ -103,7 +103,7 @@ public class VulkanCommandBuffer {
         }
     }
 
-    private static void recordDrawCommands(VkCommandBuffer commandBuffer, MemoryStack stack, int imageIndex) {
+    private static void recordDrawCommands(VkCommandBuffer commandBuffer, MemoryStack stack, int imageIndex, boolean hasCapturedTexture) {
         VkViewport.Buffer viewport = VkViewport.callocStack(1, stack);
         viewport.x(0).y(0).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight())
             .minDepth(0.0f).maxDepth(1.0f);
@@ -125,7 +125,7 @@ public class VulkanCommandBuffer {
             vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
         }
 
-        if (VulkanFullscreenQuad.isInitialized()) {
+        if (VulkanFullscreenQuad.isInitialized() && hasCapturedTexture) {
             VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
             VulkanPerformanceStats.addDrawCall(2);
         } else {

@@ -142,7 +142,7 @@ public class VulkanRenderer {
 
             int imageIndex = pImageIndex.get(0);
 
-            // Capture Minecraft's framebuffer via OpenGL bridge
+            boolean hasCapture = false;
             int fbWidth = VulkanTextureCapture.getViewportWidth();
             int fbHeight = VulkanTextureCapture.getViewportHeight();
             if (fbWidth > 0 && fbHeight > 0) {
@@ -153,10 +153,11 @@ public class VulkanRenderer {
                         VulkanPipeline.updateTexture(VulkanFullscreenQuad.getCapturedImageView());
                     }
                     MemoryUtil.memFree(pixelData);
+                    hasCapture = true;
                 }
             }
 
-            VulkanCommandBuffer.recordCommandBuffer(imageIndex);
+            VulkanCommandBuffer.recordCommandBuffer(imageIndex, hasCapture);
 
             VulkanTextureStreamer.processTextureQueue();
 
