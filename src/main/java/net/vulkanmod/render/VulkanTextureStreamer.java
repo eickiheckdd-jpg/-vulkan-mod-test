@@ -64,7 +64,7 @@ public class VulkanTextureStreamer {
         VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.callocStack(1, stack);
         VkDescriptorPoolSize poolSize = poolSizes.get(0);
         poolSize.type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        poolSize.descriptorCount(MAX_TEXTURES * 2);
+        poolSize.descriptorCount(MAX_TEXTURES);
 
         VkDescriptorPoolCreateInfo poolInfo = VkDescriptorPoolCreateInfo.callocStack(stack);
         poolInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
@@ -84,7 +84,7 @@ public class VulkanTextureStreamer {
         VkDescriptorSetLayoutBinding binding = bindings.get(0);
         binding.binding(0);
         binding.descriptorType(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        binding.descriptorCount(MAX_TEXTURES);
+        binding.descriptorCount(1);
         binding.stageFlags(VK_SHADER_STAGE_FRAGMENT_BIT);
         binding.pImmutableSamplers(null);
 

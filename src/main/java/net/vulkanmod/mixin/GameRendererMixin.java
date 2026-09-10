@@ -5,7 +5,6 @@ import net.minecraft.client.render.RenderTickCounter;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.render.VulkanMatrixExtractor;
-import net.vulkanmod.render.VulkanRenderEventBus;
 import net.vulkanmod.render.VulkanRenderStateTranslator;
 import net.vulkanmod.vulkan.VulkanRenderer;
 import org.spongepowered.asm.mixin.Mixin;
