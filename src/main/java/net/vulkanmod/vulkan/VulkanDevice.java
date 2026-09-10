@@ -106,4 +106,17 @@ public class VulkanDevice {
             vkDestroyDevice(device, null);
         }
     }
+
+    public static int findMemoryType(int typeFilter, int properties) {
+        VkPhysicalDeviceMemoryProperties memProperties = VkPhysicalDeviceMemoryProperties.callocStack();
+        vkGetPhysicalDeviceMemoryProperties(VulkanInstance.getPhysicalDevice(), memProperties);
+
+        for (int i = 0; i < memProperties.memoryTypeCount(); i++) {
+            if ((typeFilter & (1 << i)) != 0 && (memProperties.memoryTypes(i).propertyFlags() & properties) == properties) {
+                return i;
+            }
+        }
+
+        throw new RuntimeException("Failed to find suitable memory type");
+    }
 }

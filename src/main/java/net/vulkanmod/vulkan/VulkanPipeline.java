@@ -173,7 +173,7 @@ public class VulkanPipeline {
         }
     }
 
-    private static ByteBuffer loadShader(String path) {
+    static ByteBuffer loadShader(String path) {
         try {
             java.io.InputStream is = VulkanMod.class.getClassLoader().getResourceAsStream(path);
             if (is == null) {
