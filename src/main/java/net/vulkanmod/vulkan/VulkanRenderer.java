@@ -167,6 +167,10 @@ public class VulkanRenderer {
 
             VulkanCommandBuffer.recordCommandBuffer(imageIndex, hasCapture);
 
+            if (VulkanModConfig.getConfig().enableFrameReplacement && !VulkanChunkMeshBatcher.isInitialized()) {
+                VulkanMod.LOGGER.warn("Frame replacement enabled but chunk batcher not initialized. Scene will not render.");
+            }
+
             VulkanTextureStreamer.processTextureQueue();
 
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
