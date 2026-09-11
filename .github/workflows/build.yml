@@ -16,11 +16,8 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
       - run: java -version
       - run: ./gradlew clean build --stacktrace --info
-        env:
-          JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts
       - uses: actions/upload-artifact@v4
         with:
           name: vulkanmod-build
