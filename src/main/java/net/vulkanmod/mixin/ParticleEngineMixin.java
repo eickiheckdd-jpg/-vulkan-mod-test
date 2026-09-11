@@ -13,7 +13,7 @@ public class ParticleEngineMixin {
     @Inject(method = "addToBatch", at = @At("TAIL"))
     private void onRender(CallbackInfo ci) {
         if (VulkanParticleRenderer.isInitialized()) {
-            VulkanParticleRenderer.processQueue();
+            VulkanMod.LOGGER.debug("Particle renderer active");
         }
     }
 }

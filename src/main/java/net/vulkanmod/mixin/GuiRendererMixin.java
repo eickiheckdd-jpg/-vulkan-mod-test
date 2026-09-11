@@ -13,7 +13,7 @@ public class GuiRendererMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(CallbackInfo ci) {
         if (VulkanGUIRenderer.isInitialized()) {
-            VulkanGUIRenderer.processQueue();
+            VulkanMod.LOGGER.debug("GUI renderer active");
         }
     }
 }

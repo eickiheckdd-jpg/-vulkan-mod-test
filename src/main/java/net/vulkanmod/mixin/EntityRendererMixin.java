@@ -13,7 +13,7 @@ public class EntityRendererMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(CallbackInfo ci) {
         if (VulkanEntityRenderer.isInitialized()) {
-            VulkanEntityRenderer.processQueue();
+            VulkanMod.LOGGER.debug("Entity renderer active");
         }
     }
 }
