@@ -218,6 +218,26 @@ public class VulkanChunkMeshBatcher {
         meshQueue.addLast(mesh);
     }
 
+    public static void addDirectChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ) {
+        if (!initialized || vertexData == null || vertexData.remaining() == 0) return;
+
+        ChunkMesh mesh = new ChunkMesh();
+        mesh.vertexData = MemoryUtil.memAlloc(vertexData.remaining()).put(vertexData).flip();
+        mesh.vertexCount = vertexCount;
+        mesh.indexCount = indexCount;
+        mesh.offsetX = offsetX;
+        mesh.offsetY = offsetY;
+        mesh.offsetZ = offsetZ;
+        mesh.chunkId = -1;
+        mesh.minX = offsetX;
+        mesh.minY = offsetY;
+        mesh.minZ = offsetZ;
+        mesh.maxX = offsetX + 16;
+        mesh.maxY = offsetY + 16;
+        mesh.maxZ = offsetZ + 16;
+        meshQueue.addLast(mesh);
+    }
+
     public static void processQueue() {
         if (!initialized || meshQueue.isEmpty()) return;
         uploadAndRender(NULL);
