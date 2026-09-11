@@ -27,7 +27,7 @@ repositories {
     if (localMaven.exists()) {
         maven { url = localMaven.toURI(); metadataSources { artifact() } }
     }
-    maven { url = "http://maven.fabricmc.net/"; allowInsecureProtocol = true }
+    maven { url = "https://maven.fabricmc.net/" }
     mavenCentral()
 }
 
