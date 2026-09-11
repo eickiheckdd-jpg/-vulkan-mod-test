@@ -14,9 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
-    @Inject(method = "renderWorld", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderWorld", at = @At("TAIL"), cancellable = true)
     private void onRenderWorld(RenderTickCounter tickCounter, CallbackInfo ci) {
         if (!VulkanModConfig.getConfig().enableVulkanRenderer) return;
+        if (!VulkanModConfig.getConfig().enableFrameReplacement) return;
 
         if (!VulkanRenderer.isInitialized()) {
             try {
@@ -27,7 +28,7 @@ public class GameRendererMixin {
             }
         }
 
-        if (VulkanModConfig.getConfig().enableFrameReplacement) {
+        if (VulkanRenderer.isInitialized()) {
             VulkanMatrixExtractor.extractMatrices();
             VulkanRenderer.render();
             ci.cancel();
