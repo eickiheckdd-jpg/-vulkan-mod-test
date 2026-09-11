@@ -1,6 +1,6 @@
 package net.vulkanmod.render;
 
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import org.joml.Matrix4f;
@@ -15,15 +15,15 @@ public class VulkanMatrixExtractor {
     private static boolean initialized = false;
 
     public static void extractMatrices() {
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.gameRenderer == null) return;
 
         try {
             GameRenderer gameRenderer = mc.gameRenderer;
-            Camera camera = mc.getCamera();
+            Camera camera = mc.gameRenderer.getCamera();
             if (camera == null) return;
 
-            float partialTick = mc.getTickDelta();
+            float partialTick = 1.0f;
             projectionMatrix.set(gameRenderer.getBasicProjectionMatrix(partialTick));
 
             viewMatrix.identity();

@@ -47,3 +47,23 @@ jar {
         rename { "${it}_${project.archivesBaseName}" }
     }
 }
+
+task printCompileClasspath {
+    doLast {
+        println sourceSets.main.compileClasspath.files.collect { it.absolutePath }
+    }
+}
+
+task printSources {
+    doLast {
+        println sourceSets.main.java.srcDirs
+    }
+}
+
+task printCompileJavaDetails {
+    doLast {
+        println "Source dirs: ${sourceSets.main.java.srcDirs}"
+        println "Classpath:"
+        sourceSets.main.compileClasspath.files.each { println "  ${it}" }
+    }
+}

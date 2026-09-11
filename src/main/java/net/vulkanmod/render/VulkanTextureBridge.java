@@ -5,7 +5,8 @@ import net.minecraft.client.texture.TextureManager;
 import net.minecraft.util.Identifier;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.vulkan.VulkanDevice;
-import net.vulkanmod.vulkan.VulkanTextureStreamer;
+import net.vulkanmod.render.VulkanTextureStreamer;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryStack;
@@ -14,6 +15,7 @@ import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -116,27 +118,12 @@ public class VulkanTextureBridge {
 
     public static void captureAndUploadTexture(AbstractTexture texture, Identifier id) {
         try {
-            int textureId = texture.getId();
-            if (textureId <= 0) return;
+            if (texture == null) return;
 
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
-            IntBuffer width = MemoryUtil.memAllocInt(1);
-            IntBuffer height = MemoryUtil.memAllocInt(1);
-            GL11.glGetTexLevelParameteriv(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH, width);
-            GL11.glGetTexLevelParameteriv(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT, height);
-            int w = width.get(0);
-            int h = height.get(0);
-            MemoryUtil.memFree(width);
-            MemoryUtil.memFree(height);
-
-            if (w <= 0 || h <= 0) return;
-
-            ByteBuffer pixelData = MemoryUtil.memAlloc(w * h * 4);
-            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
-            GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelData);
-
-            uploadTextureData(id, pixelData, w, h);
-            MemoryUtil.memFree(pixelData);
+            long imageView = VulkanTextureStreamer.requestTexture(id.hashCode(), null, 1, 1);
+            if (imageView != NULL) {
+                textureMap.put(id, imageView);
+            }
         } catch (Exception e) {
             VulkanMod.LOGGER.debug("Failed to capture texture {}: {}", id, e.getMessage());
         }

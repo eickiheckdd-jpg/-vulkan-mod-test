@@ -1,7 +1,7 @@
 package net.vulkanmod.mixin;
 
-import net.minecraft.client.renderer.BufferBuilder;
-import net.minecraft.client.renderer.BuiltBuffer;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.BuiltBuffer;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanSectionTracker;
@@ -21,11 +21,12 @@ public class BufferBuilderMixin {
             BuiltBuffer builtBuffer = cir.getReturnValue();
             if (builtBuffer == null) return;
 
-            ByteBuffer vertexBuffer = builtBuffer.vertexBuffer();
+            ByteBuffer vertexBuffer = builtBuffer.getBuffer();
             if (vertexBuffer == null || vertexBuffer.remaining() == 0) return;
 
-            int vertexCount = builtBuffer.vertexCount();
-            int indexCount = builtBuffer.indexCount();
+            var drawParams = builtBuffer.getDrawParameters();
+            int vertexCount = drawParams.vertexCount();
+            int indexCount = drawParams.indexCount();
 
             if (vertexCount <= 0 || indexCount <= 0) return;
 

@@ -1,5 +1,6 @@
 package net.vulkanmod.vulkan;
 
+import net.vulkanmod.VulkanMod;
 import net.vulkanmod.render.VulkanMatrixExtractor;
 import net.vulkanmod.render.VulkanPerformanceStats;
 import net.vulkanmod.render.VulkanChunkMeshBatcher;
@@ -37,7 +38,7 @@ public class VulkanCommandBuffer {
             VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
             allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
             allocInfo.commandPool(VulkanDevice.getCommandPool());
-            allocInfo.level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+            allocInfo.level(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             allocInfo.commandBufferCount(imageCount);
 
             PointerBuffer pCommandBuffers = stack.mallocPointer(imageCount);
@@ -137,7 +138,7 @@ public class VulkanCommandBuffer {
             if (VulkanPipeline.getDescriptorSet() != NULL) {
                 vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
             }
-            VulkanChunkMeshBatcher.uploadAndRender(commandBuffer);
+            VulkanChunkMeshBatcher.uploadAndRender(commandBuffer.address());
             VulkanPerformanceStats.addDrawCall(1);
         }
 
@@ -158,19 +159,19 @@ public class VulkanCommandBuffer {
         }
 
         if (VulkanEntityRenderer.isInitialized()) {
-            VulkanEntityRenderer.uploadAndRender(commandBuffer);
+            VulkanEntityRenderer.uploadAndRender(commandBuffer.address());
         }
 
         if (VulkanParticleRenderer.isInitialized()) {
-            VulkanParticleRenderer.uploadAndRender(commandBuffer);
+            VulkanParticleRenderer.uploadAndRender(commandBuffer.address());
         }
 
         if (VulkanGUIRenderer.isInitialized()) {
-            VulkanGUIRenderer.uploadAndRender(commandBuffer);
+            VulkanGUIRenderer.uploadAndRender(commandBuffer.address());
         }
 
         if (VulkanDebugOverlay.isInitialized() && VulkanModConfig.getConfig().enableDebugOverlay) {
-            VulkanDebugOverlay.render(commandBuffer, VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
+            VulkanDebugOverlay.render(commandBuffer.address(), VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
         }
     }
 
@@ -178,17 +179,12 @@ public class VulkanCommandBuffer {
         return commandBuffers;
     }
 
-    public static long getFence(int imageIndex) {
-        if (imageIndex < 0 || imageIndex >= perFrameFences.length) return NULL;
-        return perFrameFences[imageIndex];
-    }
-
     public static void submitOneShot(CommandRecorder recorder) {
         try (MemoryStack stack = stackPush()) {
             VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
             allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
             allocInfo.commandPool(VulkanDevice.getCommandPool());
-            allocInfo.level(VK_STRUCTURE_TYPE_COMMAND_BUFFER_LEVEL_PRIMARY);
+            allocInfo.level(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
             allocInfo.commandBufferCount(1);
 
             PointerBuffer pCommandBuffer = stack.mallocPointer(1);
@@ -200,7 +196,7 @@ public class VulkanCommandBuffer {
 
             VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
             beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
-            beginInfo.flags(VK_STRUCTURE_TYPE_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+            beginInfo.flags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
             VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
             vkBeginCommandBuffer(cmdBuf, beginInfo);
