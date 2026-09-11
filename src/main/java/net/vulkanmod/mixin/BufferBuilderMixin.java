@@ -35,7 +35,7 @@ public class BufferBuilderMixin {
             float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
 
             for (int i = 0; i < vertexCount; i++) {
-                int offset = i * 16; // 4 floats per vertex: pos(3) + uv(1) = 16 bytes
+                int offset = i * 32; // 8 floats per vertex: pos(3) + uv(2) + color(4) + padding = 32 bytes
                 if (offset + 12 <= vertexData.remaining()) {
                     float x = vertexData.getFloat(offset);
                     float y = vertexData.getFloat(offset + 4);
