@@ -1,6 +1,6 @@
 buildscript {
     repositories {
-        maven { url "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo" }
+        maven { url = "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo" }
     }
     dependencies {
         classpath 'net.fabricmc:fabric-loom:1.14.10'
@@ -18,7 +18,7 @@ base {
 }
 
 repositories {
-    maven { url "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo"; metadataSources { artifact() } }
+    maven { url = "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo"; metadataSources { artifact() } }
 }
 
 dependencies {
