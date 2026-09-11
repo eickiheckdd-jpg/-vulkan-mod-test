@@ -122,20 +122,22 @@ public class VulkanCommandBuffer {
             .extent(VkExtent2D.callocStack(stack).width(VulkanSwapchain.getWidth()).height(VulkanSwapchain.getHeight()));
         vkCmdSetScissor(commandBuffer, 0, scissor);
 
-        vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
-
-        float[] mvp = VulkanMatrixExtractor.getMVPMatrix();
-        if (mvp != null && mvp.length == 16) {
-            vkCmdPushConstants(commandBuffer, VulkanPipeline.getPipelineLayout(), VK10.VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(mvp).flip());
-        }
-
-        if (VulkanPipeline.getDescriptorSet() != NULL) {
-            vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
+        if (VulkanChunkMeshBatcher.isInitialized()) {
+            vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
+            float[] mvp = VulkanMatrixExtractor.getMVPMatrix();
+            if (mvp != null && mvp.length == 16) {
+                vkCmdPushConstants(commandBuffer, VulkanPipeline.getPipelineLayout(), VK10.VK_SHADER_STAGE_VERTEX_BIT, 0, stack.floats(mvp).flip());
+            }
+            if (VulkanPipeline.getDescriptorSet() != NULL) {
+                vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
+            }
+            VulkanChunkMeshBatcher.uploadAndRender(commandBuffer);
+            VulkanPerformanceStats.addDrawCall(1);
         }
 
         if (VulkanFullscreenQuad.isInitialized() && hasCapturedTexture) {
             VulkanFullscreenQuad.render(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
-            VulkanPerformanceStats.addDrawCall(2);
+            VulkanPerformanceStats.addDrawCall(1);
         } else {
             vkCmdDraw(commandBuffer, 3, 1, 0, 0);
             VulkanPerformanceStats.addDrawCall(1);
@@ -143,10 +145,6 @@ public class VulkanCommandBuffer {
 
         if (VulkanVertexCapture.isInitialized()) {
             VulkanVertexCapture.uploadAndRender(commandBuffers[imageIndex], VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
-        }
-
-        if (VulkanChunkMeshBatcher.isInitialized()) {
-            VulkanChunkMeshBatcher.uploadAndRender(commandBuffers[imageIndex]);
         }
 
         if (VulkanIndirectDrawSystem.isInitialized()) {

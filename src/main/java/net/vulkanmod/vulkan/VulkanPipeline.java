@@ -18,6 +18,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 public class VulkanPipeline {
     private static long pipeline;
     private static long pipelineLayout;
+    private static long terrainPipeline;
+    private static long terrainPipelineLayout;
     private static long descriptorSetLayout;
     private static long descriptorPool;
     private static long descriptorSet;
