@@ -6,6 +6,9 @@ import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanIndirectDrawSystem;
 import net.vulkanmod.render.VulkanEntityRenderer;
 import net.vulkanmod.render.VulkanParticleRenderer;
+import net.vulkanmod.render.VulkanGUIRenderer;
+import net.vulkanmod.render.VulkanDebugOverlay;
+import net.vulkanmod.config.VulkanModConfig;
 import net.vulkanmod.vulkan.VulkanVertexCapture;
 import net.vulkanmod.vulkan.VulkanDevice;
 import org.lwjgl.PointerBuffer;
@@ -159,6 +162,14 @@ public class VulkanCommandBuffer {
 
         if (VulkanParticleRenderer.isInitialized()) {
             VulkanParticleRenderer.uploadAndRender(commandBuffer);
+        }
+
+        if (VulkanGUIRenderer.isInitialized()) {
+            VulkanGUIRenderer.uploadAndRender(commandBuffer);
+        }
+
+        if (VulkanDebugOverlay.isInitialized() && VulkanModConfig.getConfig().enableDebugOverlay) {
+            VulkanDebugOverlay.render(commandBuffer, VulkanSwapchain.getWidth(), VulkanSwapchain.getHeight());
         }
     }
 
