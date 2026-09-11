@@ -1,5 +1,7 @@
 package net.vulkanmod.render;
 
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.vulkanmod.VulkanMod;
 import net.vulkanmod.render.VulkanFrustumCuller;
 import net.vulkanmod.vulkan.VulkanDevice;
@@ -19,9 +21,14 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanChunkMeshBatcher {
+    public static final int LAYER_SOLID = 0;
+    public static final int LAYER_CUTOUT = 1;
+    public static final int LAYER_TRANSLUCENT = 2;
+    public static final int LAYER_COUNT = 3;
+
     private static final int MAX_CHUNKS = 256;
     private static final int MAX_VERTICES_PER_CHUNK = 65536;
-    private static final int VERTEX_SIZE = 16; // pos(12) + uv(4) + light(4) + normal(4) = 24, simplified to 16 for now
+    private static final int VERTEX_SIZE = 36;
 
     private static long vertexBuffer;
     private static long vertexBufferMemory;
@@ -44,6 +51,9 @@ public class VulkanChunkMeshBatcher {
         int chunkId;
         float minX, minY, minZ;
         float maxX, maxY, maxZ;
+        VertexFormat format;
+        int stride;
+        int renderLayer;
     }
 
     private static final Deque<ChunkMesh> meshQueue = new ArrayDeque<>();
@@ -107,7 +117,7 @@ public class VulkanChunkMeshBatcher {
     }
 
     private static void createIndexBuffer(MemoryStack stack) {
-        long bufferSize = (long) MAX_CHUNKS * MAX_VERTICES_PER_CHUNK * 6 * 2; // 6 indices per quad, 2 bytes each
+        long bufferSize = (long) MAX_CHUNKS * MAX_VERTICES_PER_CHUNK * 6 * 2;
 
         VkBufferCreateInfo bufferInfo = VkBufferCreateInfo.callocStack(stack);
         bufferInfo.sType(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO);
@@ -190,21 +200,31 @@ public class VulkanChunkMeshBatcher {
         }
     }
 
-    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount) {
-        addChunkMesh(vertexData, vertexCount, indexCount, 0.0f, 0.0f, 0.0f, -1, 0, 0, 0, 16, 16, 16);
-    }
-
     public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ) {
-        addChunkMesh(vertexData, vertexCount, indexCount, offsetX, offsetY, offsetZ, -1, offsetX, offsetY, offsetZ, offsetX + 16, offsetY + 16, offsetZ + 16);
+        addChunkMesh(vertexData, vertexCount, indexCount, 36, null, offsetX, offsetY, offsetZ, -1, 0.0f, 0.0f, 0.0f, 16.0f, 16.0f, 16.0f, LAYER_SOLID);
     }
 
     public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ, int chunkId, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+        addChunkMesh(vertexData, vertexCount, indexCount, 36, null, offsetX, offsetY, offsetZ, chunkId, minX, minY, minZ, maxX, maxY, maxZ, LAYER_SOLID);
+    }
+
+    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, int stride, VertexFormat format, float offsetX, float offsetY, float offsetZ) {
+        addChunkMesh(vertexData, vertexCount, indexCount, stride, format, offsetX, offsetY, offsetZ, -1, 0, 0, 0, 16, 16, 16, LAYER_SOLID);
+    }
+
+    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, int stride, VertexFormat format, float offsetX, float offsetY, float offsetZ, int chunkId, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+        addChunkMesh(vertexData, vertexCount, indexCount, stride, format, offsetX, offsetY, offsetZ, chunkId, minX, minY, minZ, maxX, maxY, maxZ, LAYER_SOLID);
+    }
+
+    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, int stride, VertexFormat format, float offsetX, float offsetY, float offsetZ, int chunkId, float minX, float minY, float minZ, float maxX, float maxY, float maxZ, int renderLayer) {
         if (!initialized || vertexData == null || vertexData.remaining() == 0) return;
 
         ChunkMesh mesh = new ChunkMesh();
         mesh.vertexData = MemoryUtil.memAlloc(vertexData.remaining()).put(vertexData).flip();
         mesh.vertexCount = vertexCount;
         mesh.indexCount = indexCount;
+        mesh.stride = stride;
+        mesh.format = format;
         mesh.offsetX = offsetX;
         mesh.offsetY = offsetY;
         mesh.offsetZ = offsetZ;
@@ -215,6 +235,7 @@ public class VulkanChunkMeshBatcher {
         mesh.maxX = maxX;
         mesh.maxY = maxY;
         mesh.maxZ = maxZ;
+        mesh.renderLayer = renderLayer;
         meshQueue.addLast(mesh);
     }
 
@@ -281,8 +302,8 @@ public class VulkanChunkMeshBatcher {
                     for (ChunkMesh mesh : visibleMeshes) {
                         ByteBuffer positioned = MemoryUtil.memAlloc(mesh.vertexData.remaining());
                         positioned.put(mesh.vertexData).flip();
-                        for (int i = 0; i < positioned.remaining() / 32; i++) {
-                            int off = i * 32;
+                        for (int i = 0; i < positioned.remaining() / mesh.stride; i++) {
+                            int off = i * mesh.stride;
                             if (off + 12 <= positioned.remaining()) {
                                 float x = positioned.getFloat(off) + mesh.offsetX;
                                 float y = positioned.getFloat(off + 4) + mesh.offsetY;

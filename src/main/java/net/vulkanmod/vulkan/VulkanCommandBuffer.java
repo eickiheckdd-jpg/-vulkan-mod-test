@@ -130,6 +130,7 @@ public class VulkanCommandBuffer {
 
         if (VulkanChunkMeshBatcher.isInitialized()) {
             VulkanChunkMeshBatcher.updateFrustum(VulkanMatrixExtractor.getProjectionMatrix(), VulkanMatrixExtractor.getViewMatrix());
+            
             vkCmdBindPipeline(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipeline());
             float[] mvp = VulkanMatrixExtractor.getMVPMatrix();
             if (mvp != null && mvp.length == 16) {
@@ -138,6 +139,7 @@ public class VulkanCommandBuffer {
             if (VulkanPipeline.getDescriptorSet() != NULL) {
                 vkCmdBindDescriptorSets(commandBuffer, VK10.VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipeline.getPipelineLayout(), 0, stack.longs(VulkanPipeline.getDescriptorSet()), null);
             }
+            
             VulkanChunkMeshBatcher.uploadAndRender(commandBuffer.address());
             VulkanPerformanceStats.addDrawCall(1);
         }

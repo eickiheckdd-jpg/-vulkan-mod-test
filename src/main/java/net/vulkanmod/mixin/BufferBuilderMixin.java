@@ -1,5 +1,7 @@
 package net.vulkanmod.mixin;
 
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BuiltBuffer;
 import net.vulkanmod.VulkanMod;
@@ -27,21 +29,26 @@ public class BufferBuilderMixin {
             var drawParams = builtBuffer.getDrawParameters();
             int vertexCount = drawParams.vertexCount();
             int indexCount = drawParams.indexCount();
+            VertexFormat format = drawParams.format();
 
             if (vertexCount <= 0 || indexCount <= 0) return;
 
             ByteBuffer vertexData = vertexBuffer.slice();
+            int stride = format.getVertexSize();
 
             float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
             float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
 
-            int stride = 32;
+            int posOffset = getElementOffset(format, VertexFormatElement.POSITION);
+            int uvOffset = getElementOffset(format, VertexFormatElement.UV0 != null ? VertexFormatElement.UV0 : VertexFormatElement.UV);
+            int colorOffset = getElementOffset(format, VertexFormatElement.COLOR);
+
             for (int i = 0; i < vertexCount && i * stride < vertexData.remaining(); i++) {
-                int offset = i * stride;
-                if (offset + 12 <= vertexData.remaining()) {
-                    float x = vertexData.getFloat(offset);
-                    float y = vertexData.getFloat(offset + 4);
-                    float z = vertexData.getFloat(offset + 8);
+                int off = i * stride;
+                if (off + posOffset + 12 <= vertexData.remaining()) {
+                    float x = vertexData.getFloat(off + posOffset);
+                    float y = vertexData.getFloat(off + posOffset + 4);
+                    float z = vertexData.getFloat(off + posOffset + 8);
                     if (x < minX) minX = x;
                     if (y < minY) minY = y;
                     if (z < minZ) minZ = z;
@@ -63,9 +70,15 @@ public class BufferBuilderMixin {
                 offsetZ = ((int) minZ / 16) * 16;
             }
 
-            VulkanChunkMeshBatcher.addChunkMesh(vertexData, vertexCount, indexCount, offsetX, offsetY, offsetZ);
+            VulkanChunkMeshBatcher.addChunkMesh(vertexData, vertexCount, indexCount, stride, format, offsetX, offsetY, offsetZ);
         } catch (Exception e) {
             VulkanMod.LOGGER.warn("Failed to capture chunk mesh: {}", e.getMessage());
         }
+    }
+
+    private static int getElementOffset(VertexFormat format, VertexFormatElement element) {
+        if (element == null) return -1;
+        int offset = format.getOffset(element);
+        return offset >= 0 ? offset : -1;
     }
 }

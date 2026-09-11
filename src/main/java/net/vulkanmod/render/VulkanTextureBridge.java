@@ -28,7 +28,6 @@ public class VulkanTextureBridge {
     private static boolean initialized = false;
     private static long stagingBuffer;
     private static long stagingBufferMemory;
-    private static long contextHandle;
 
     public static synchronized void initialize() {
         if (initialized) return;
@@ -120,10 +119,30 @@ public class VulkanTextureBridge {
         try {
             if (texture == null) return;
 
-            long imageView = VulkanTextureStreamer.requestTexture(id.hashCode(), null, 1, 1);
-            if (imageView != NULL) {
-                textureMap.put(id, imageView);
+            com.mojang.blaze3d.textures.GpuTexture gpuTexture = texture.getGlTexture();
+            if (gpuTexture == null) return;
+
+            int glId = 0;
+            int width = gpuTexture.getWidth(0);
+            int height = gpuTexture.getHeight(0);
+
+            if (gpuTexture instanceof net.minecraft.client.texture.GlTexture glTexture) {
+                glId = glTexture.getGlId();
             }
+
+            if (glId == 0 || width <= 0 || height <= 0) return;
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, glId);
+            ByteBuffer pixelData = ByteBuffer.allocateDirect(width * height * 4);
+            GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelData);
+
+            int slot = VulkanTextureStreamer.requestTexture(id.hashCode(), pixelData, width, height);
+            if (slot >= 0) {
+                long descriptorSet = VulkanTextureStreamer.getDescriptorSet(slot);
+                textureMap.put(id, descriptorSet);
+            }
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         } catch (Exception e) {
             VulkanMod.LOGGER.debug("Failed to capture texture {}: {}", id, e.getMessage());
         }
