@@ -1,6 +1,7 @@
 package net.vulkanmod.render;
 
 import net.vulkanmod.VulkanMod;
+import net.vulkanmod.render.VulkanFrustumCuller;
 import net.vulkanmod.vulkan.VulkanDevice;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -40,6 +41,9 @@ public class VulkanChunkMeshBatcher {
         float offsetX;
         float offsetY;
         float offsetZ;
+        int chunkId;
+        float minX, minY, minZ;
+        float maxX, maxY, maxZ;
     }
 
     private static final Deque<ChunkMesh> meshQueue = new ArrayDeque<>();
@@ -187,10 +191,14 @@ public class VulkanChunkMeshBatcher {
     }
 
     public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount) {
-        addChunkMesh(vertexData, vertexCount, indexCount, 0.0f, 0.0f, 0.0f);
+        addChunkMesh(vertexData, vertexCount, indexCount, 0.0f, 0.0f, 0.0f, -1, 0, 0, 0, 16, 16, 16);
     }
 
     public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ) {
+        addChunkMesh(vertexData, vertexCount, indexCount, offsetX, offsetY, offsetZ, -1, offsetX, offsetY, offsetZ, offsetX + 16, offsetY + 16, offsetZ + 16);
+    }
+
+    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ, int chunkId, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
         if (!initialized || vertexData == null || vertexData.remaining() == 0) return;
 
         ChunkMesh mesh = new ChunkMesh();
@@ -200,6 +208,13 @@ public class VulkanChunkMeshBatcher {
         mesh.offsetX = offsetX;
         mesh.offsetY = offsetY;
         mesh.offsetZ = offsetZ;
+        mesh.chunkId = chunkId;
+        mesh.minX = minX;
+        mesh.minY = minY;
+        mesh.minZ = minZ;
+        mesh.maxX = maxX;
+        mesh.maxY = maxY;
+        mesh.maxZ = maxZ;
         meshQueue.addLast(mesh);
     }
 
@@ -208,13 +223,32 @@ public class VulkanChunkMeshBatcher {
         uploadAndRender(NULL);
     }
 
+    public static void updateFrustum(float[] projection, float[] view) {
+        if (!initialized) return;
+        VulkanFrustumCuller.updateMatrices(projection, view);
+    }
+
     public static void uploadAndRender(long commandBuffer) {
         if (!initialized || meshQueue.isEmpty()) return;
+
+        Deque<ChunkMesh> visibleMeshes = new ArrayDeque<>();
+        for (ChunkMesh mesh : meshQueue) {
+            if (mesh.chunkId >= 0) {
+                VulkanFrustumCuller.updateChunkBounds(mesh.chunkId, mesh.minX, mesh.minY, mesh.minZ, mesh.maxX, mesh.maxY, mesh.maxZ);
+                if (!VulkanFrustumCuller.isChunkVisible(mesh.chunkId)) continue;
+            }
+            visibleMeshes.addLast(mesh);
+        }
+
+        if (visibleMeshes.isEmpty()) {
+            meshQueue.clear();
+            return;
+        }
 
         try (MemoryStack stack = stackPush()) {
             long totalVertexSize = 0;
             long totalIndexSize = 0;
-            for (ChunkMesh mesh : meshQueue) {
+            for (ChunkMesh mesh : visibleMeshes) {
                 totalVertexSize += mesh.vertexData.remaining();
                 totalIndexSize += mesh.indexCount * 2L;
             }
@@ -224,7 +258,7 @@ public class VulkanChunkMeshBatcher {
                 int result = vkMapMemory(VulkanDevice.getDevice(), stagingBufferMemory, 0, totalVertexSize, 0, pData);
                 if (result == VK_SUCCESS) {
                     long dstPtr = pData.get(0);
-                    for (ChunkMesh mesh : meshQueue) {
+                    for (ChunkMesh mesh : visibleMeshes) {
                         ByteBuffer positioned = MemoryUtil.memAlloc(mesh.vertexData.remaining());
                         positioned.put(mesh.vertexData).flip();
                         for (int i = 0; i < positioned.remaining() / 32; i++) {
@@ -261,16 +295,16 @@ public class VulkanChunkMeshBatcher {
             vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
             long vertexOffset = 0;
-            for (ChunkMesh mesh : meshQueue) {
+            for (ChunkMesh mesh : visibleMeshes) {
                 vkCmdDrawIndexed(cmdBuf, mesh.indexCount, 1, (int)vertexOffset, 0, 0);
                 vertexOffset += mesh.vertexCount;
             }
 
-            for (ChunkMesh mesh : meshQueue) {
+            for (ChunkMesh mesh : visibleMeshes) {
                 MemoryUtil.memFree(mesh.vertexData);
             }
-            meshQueue.clear();
         }
+        meshQueue.clear();
     }
 
     public static void cleanup() {
