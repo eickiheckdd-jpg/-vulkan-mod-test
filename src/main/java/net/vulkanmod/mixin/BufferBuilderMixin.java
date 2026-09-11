@@ -34,23 +34,27 @@ public class BufferBuilderMixin {
             float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
             float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
 
-            for (int i = 0; i < vertexCount; i++) {
-                int offset = i * 32; // 8 floats per vertex: pos(3) + uv(2) + color(4) + padding = 32 bytes
+            int stride = 32;
+            for (int i = 0; i < vertexCount && i * stride < vertexData.remaining(); i++) {
+                int offset = i * stride;
                 if (offset + 12 <= vertexData.remaining()) {
                     float x = vertexData.getFloat(offset);
                     float y = vertexData.getFloat(offset + 4);
                     float z = vertexData.getFloat(offset + 8);
-                    minX = Math.min(minX, x);
-                    minY = Math.min(minY, y);
-                    minZ = Math.min(minZ, z);
-                    maxX = Math.max(maxX, x);
-                    maxY = Math.max(maxY, y);
-                    maxZ = Math.max(maxZ, z);
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (z < minZ) minZ = z;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                    if (z > maxZ) maxZ = z;
                 }
             }
 
             float offsetX = 0, offsetY = 0, offsetZ = 0;
-            boolean isLocalSpace = (maxX - minX) <= 20.0f && (maxY - minY) <= 20.0f && (maxZ - minZ) <= 20.0f;
+            float dx = maxX - minX;
+            float dy = maxY - minY;
+            float dz = maxZ - minZ;
+            boolean isLocalSpace = dx <= 20.0f && dy <= 20.0f && dz <= 20.0f;
 
             if (isLocalSpace && minX >= -1.0f && minY >= -1.0f && minZ >= -1.0f) {
                 offsetX = ((int) minX / 16) * 16;
