@@ -37,6 +37,9 @@ public class VulkanChunkMeshBatcher {
         int firstVertex;
         int firstIndex;
         long descriptorSet;
+        float offsetX;
+        float offsetY;
+        float offsetZ;
     }
 
     private static final Deque<ChunkMesh> meshQueue = new ArrayDeque<>();
@@ -184,12 +187,19 @@ public class VulkanChunkMeshBatcher {
     }
 
     public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount) {
+        addChunkMesh(vertexData, vertexCount, indexCount, 0.0f, 0.0f, 0.0f);
+    }
+
+    public static void addChunkMesh(ByteBuffer vertexData, int vertexCount, int indexCount, float offsetX, float offsetY, float offsetZ) {
         if (!initialized || vertexData == null || vertexData.remaining() == 0) return;
 
         ChunkMesh mesh = new ChunkMesh();
         mesh.vertexData = MemoryUtil.memAlloc(vertexData.remaining()).put(vertexData).flip();
         mesh.vertexCount = vertexCount;
         mesh.indexCount = indexCount;
+        mesh.offsetX = offsetX;
+        mesh.offsetY = offsetY;
+        mesh.offsetZ = offsetZ;
         meshQueue.addLast(mesh);
     }
 
@@ -215,7 +225,22 @@ public class VulkanChunkMeshBatcher {
                 if (result == VK_SUCCESS) {
                     long dstPtr = pData.get(0);
                     for (ChunkMesh mesh : meshQueue) {
-                        MemoryUtil.memCopy(MemoryUtil.memAddress(mesh.vertexData), dstPtr, mesh.vertexData.remaining());
+                        ByteBuffer positioned = MemoryUtil.memAlloc(mesh.vertexData.remaining());
+                        positioned.put(mesh.vertexData).flip();
+                        for (int i = 0; i < positioned.remaining() / 32; i++) {
+                            int off = i * 32;
+                            if (off + 12 <= positioned.remaining()) {
+                                float x = positioned.getFloat(off) + mesh.offsetX;
+                                float y = positioned.getFloat(off + 4) + mesh.offsetY;
+                                float z = positioned.getFloat(off + 8) + mesh.offsetZ;
+                                positioned.putFloat(off, x);
+                                positioned.putFloat(off + 4, y);
+                                positioned.putFloat(off + 8, z);
+                            }
+                        }
+                        positioned.flip();
+                        MemoryUtil.memCopy(MemoryUtil.memAddress(positioned), dstPtr, positioned.remaining());
+                        MemoryUtil.memFree(positioned);
                         dstPtr += mesh.vertexData.remaining();
                     }
                     vkUnmapMemory(VulkanDevice.getDevice(), stagingBufferMemory);
