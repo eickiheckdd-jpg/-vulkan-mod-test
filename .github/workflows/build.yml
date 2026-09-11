@@ -17,10 +17,17 @@ jobs:
           java-version: 21
           cache: gradle
       - run: java -version
-      - run: gradle clean build
+      - run: gradle --version
+      - run: gradle clean build --stacktrace --info 2>&1 | tee build.log
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: vulkanmod-build
           path: build/libs/*.jar
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: build.log
