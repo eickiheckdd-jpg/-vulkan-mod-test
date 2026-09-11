@@ -1,8 +1,6 @@
 package net.vulkanmod.mixin;
 
 import net.minecraft.client.render.WorldRenderer;
-import net.vulkanmod.VulkanMod;
-import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanMatrixExtractor;
 import net.vulkanmod.render.VulkanSectionTracker;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,7 +14,5 @@ public class LevelRendererMixin {
     private void onRender(CallbackInfo ci) {
         VulkanSectionTracker.updateFromCamera();
         VulkanMatrixExtractor.extractMatrices();
-        VulkanChunkMeshBatcher.updateFrustum(VulkanMatrixExtractor.getProjectionMatrix(), VulkanMatrixExtractor.getViewMatrix());
-        VulkanChunkMeshBatcher.processQueue();
     }
 }
