@@ -1,7 +1,8 @@
 buildscript {
     repositories {
-        maven { url "https://maven.fabricmc.net/" }
-        maven { url "https://maven.aliyun.com/repository/public" }
+        maven { url "http://maven.fabricmc.net/"; allowInsecureProtocol = true }
+        maven { url "http://maven.aliyun.com/repository/public"; allowInsecureProtocol = true }
+        maven { url "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo" }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -21,8 +22,9 @@ base {
 }
 
 repositories {
-    maven { url "https://maven.fabricmc.net/" }
-    maven { url "https://maven.aliyun.com/repository/public" }
+    maven { url "http://maven.fabricmc.net/"; allowInsecureProtocol = true }
+    maven { url "http://maven.aliyun.com/repository/public"; allowInsecureProtocol = true }
+    maven { url "/workspace/0a8a8e22-2500-497e-a09b-b68098e4a330/sessions/agent_d2bdd465-ec30-4b92-8494-340b50fb3033/.gradle/maven-repo"; metadataSources { artifact() } }
     mavenCentral()
     gradlePluginPortal()
 }

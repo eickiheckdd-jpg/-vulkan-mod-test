@@ -1,19 +1,15 @@
 allprojects {
     buildscript {
         repositories {
-            maven {
-                url "http://maven.fabricmc.net/"
-                allowInsecureProtocol true
-            }
+            maven { url "http://maven.fabricmc.net/"; allowInsecureProtocol = true }
+            maven { url "http://maven.aliyun.com/repository/public"; allowInsecureProtocol = true }
             mavenCentral()
             gradlePluginPortal()
         }
     }
     repositories {
-        maven {
-            url "http://maven.fabricmc.net/"
-            allowInsecureProtocol true
-        }
+        maven { url "http://maven.fabricmc.net/"; allowInsecureProtocol = true }
+        maven { url "http://maven.aliyun.com/repository/public"; allowInsecureProtocol = true }
         mavenCentral()
         gradlePluginPortal()
     }
