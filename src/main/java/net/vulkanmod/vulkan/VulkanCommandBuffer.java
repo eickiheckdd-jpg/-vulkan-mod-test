@@ -163,6 +163,67 @@ public class VulkanCommandBuffer {
         return perFrameFences[imageIndex];
     }
 
+    public static void submitOneShot(CommandRecorder recorder) {
+        try (MemoryStack stack = stackPush()) {
+            VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
+            allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
+            allocInfo.commandPool(VulkanDevice.getCommandPool());
+            allocInfo.level(VK_STRUCTURE_TYPE_COMMAND_BUFFER_LEVEL_PRIMARY);
+            allocInfo.commandBufferCount(1);
+
+            PointerBuffer pCommandBuffer = stack.mallocPointer(1);
+            int result = vkAllocateCommandBuffers(VulkanDevice.getDevice(), allocInfo, pCommandBuffer);
+            if (result != VK_SUCCESS) {
+                throw new RuntimeException("Failed to allocate one-shot command buffer: " + result);
+            }
+            long commandBuffer = pCommandBuffer.get(0);
+
+            VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.callocStack(stack);
+            beginInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
+            beginInfo.flags(VK_STRUCTURE_TYPE_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+            VkCommandBuffer cmdBuf = new VkCommandBuffer(commandBuffer, VulkanDevice.getDevice());
+            vkBeginCommandBuffer(cmdBuf, beginInfo);
+
+            recorder.record(cmdBuf, stack);
+
+            vkEndCommandBuffer(cmdBuf);
+
+            VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
+            submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
+            submitInfo.pCommandBuffers(stack.pointers(commandBuffer));
+
+            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.callocStack(stack);
+            fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
+            fenceInfo.flags(0);
+
+            LongBuffer pFence = stack.mallocLong(1);
+            result = vkCreateFence(VulkanDevice.getDevice(), fenceInfo, null, pFence);
+            if (result != VK_SUCCESS) {
+                throw new RuntimeException("Failed to create one-shot fence: " + result);
+            }
+            long fence = pFence.get(0);
+
+            result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, fence);
+            if (result != VK_SUCCESS) {
+                vkDestroyFence(VulkanDevice.getDevice(), fence, null);
+                vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(), stack.pointers(commandBuffer));
+                throw new RuntimeException("Failed to submit one-shot command buffer: " + result);
+            }
+
+            vkWaitForFences(VulkanDevice.getDevice(), stack.longs(fence), true, Long.MAX_VALUE);
+            vkDestroyFence(VulkanDevice.getDevice(), fence, null);
+            vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(), stack.pointers(commandBuffer));
+        } catch (Exception e) {
+            VulkanMod.LOGGER.warn("One-shot command submission failed: {}", e.getMessage());
+        }
+    }
+
+    @FunctionalInterface
+    public interface CommandRecorder {
+        void record(VkCommandBuffer commandBuffer, MemoryStack stack);
+    }
+
     public static void cleanup() {
         if (commandBuffers != null) {
             PointerBuffer pCommandBuffers = MemoryUtil.memAllocPointer(commandBuffers.length);

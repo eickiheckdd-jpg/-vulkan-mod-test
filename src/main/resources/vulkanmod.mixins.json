@@ -10,7 +10,8 @@
     "EntityRendererMixin",
     "ParticleEngineMixin",
     "GuiRendererMixin",
-    "TextureManagerMixin"
+    "TextureManagerMixin",
+    "BufferBuilderMixin"
   ],
   "injectors": {
     "defaultRequire": 1
