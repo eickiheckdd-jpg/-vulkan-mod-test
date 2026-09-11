@@ -4,6 +4,8 @@ import net.vulkanmod.render.VulkanMatrixExtractor;
 import net.vulkanmod.render.VulkanPerformanceStats;
 import net.vulkanmod.render.VulkanChunkMeshBatcher;
 import net.vulkanmod.render.VulkanIndirectDrawSystem;
+import net.vulkanmod.render.VulkanEntityRenderer;
+import net.vulkanmod.render.VulkanParticleRenderer;
 import net.vulkanmod.vulkan.VulkanVertexCapture;
 import net.vulkanmod.vulkan.VulkanDevice;
 import org.lwjgl.PointerBuffer;
@@ -149,6 +151,14 @@ public class VulkanCommandBuffer {
 
         if (VulkanIndirectDrawSystem.isInitialized()) {
             VulkanIndirectDrawSystem.executeIndirectDraw(commandBuffers[imageIndex]);
+        }
+
+        if (VulkanEntityRenderer.isInitialized()) {
+            VulkanEntityRenderer.uploadAndRender(commandBuffer);
+        }
+
+        if (VulkanParticleRenderer.isInitialized()) {
+            VulkanParticleRenderer.uploadAndRender(commandBuffer);
         }
     }
 
