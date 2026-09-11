@@ -17,7 +17,6 @@ public class GameRendererMixin {
     @Inject(method = "renderWorld", at = @At("HEAD"), cancellable = true)
     private void onRenderWorld(RenderTickCounter tickCounter, CallbackInfo ci) {
         if (!VulkanModConfig.getConfig().enableVulkanRenderer) return;
-        if (!VulkanModConfig.getConfig().enableFrameReplacement) return;
 
         if (!VulkanRenderer.isInitialized()) {
             try {
@@ -28,7 +27,7 @@ public class GameRendererMixin {
             }
         }
 
-        if (VulkanRenderer.isInitialized()) {
+        if (VulkanModConfig.getConfig().enableFrameReplacement) {
             VulkanMatrixExtractor.extractMatrices();
             VulkanRenderer.render();
             ci.cancel();
