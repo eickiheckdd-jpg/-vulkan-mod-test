@@ -2,6 +2,7 @@ package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -24,62 +25,94 @@ public class VulkanSwapchain {
     private static long[] swapchainImages;
     private static long[] imageViews;
     private static int imageFormat;
+    private static int imageColorSpace;
     private static int width;
     private static int height;
 
+    public static void createSurface(long window) {
+        if (surface != MemoryUtil.NULL) return;
+        try (MemoryStack stack = stackPush()) {
+            LongBuffer pSurface = stack.mallocLong(1);
+            int result = glfwCreateWindowSurface(VulkanInstance.getInstance(), window, null, pSurface);
+            if (result != VK_SUCCESS) {
+                throw new RuntimeException("Failed to create window surface: " + result);
+            }
+            surface = pSurface.get(0);
+        }
+    }
+
     public static void create(long window) {
         try (MemoryStack stack = stackPush()) {
-            if (surface == MemoryUtil.NULL) {
-                LongBuffer pSurface = stack.mallocLong(1);
-                int result = glfwCreateWindowSurface(VulkanInstance.getInstance(), window, null, pSurface);
-                if (result != VK_SUCCESS) {
-                    throw new RuntimeException("Failed to create window surface: " + result);
-                }
-                surface = pSurface.get(0);
-            }
+            createSurface(window);
+            cleanupSwapchain();
 
             VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.callocStack(stack);
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VulkanInstance.getPhysicalDevice(), surface, capabilities);
+            int result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+                VulkanInstance.getPhysicalDevice(), surface, capabilities
+            );
+            if (result != VK_SUCCESS) {
+                throw new RuntimeException("Failed to query surface capabilities: " + result);
+            }
 
             IntBuffer pSurfaceFormatCount = stack.ints(0);
             vkGetPhysicalDeviceSurfaceFormatsKHR(VulkanInstance.getPhysicalDevice(), surface, pSurfaceFormatCount, null);
+            if (pSurfaceFormatCount.get(0) == 0) {
+                throw new RuntimeException("The Vulkan surface exposes no supported formats");
+            }
             VkSurfaceFormatKHR.Buffer formats = VkSurfaceFormatKHR.calloc(pSurfaceFormatCount.get(0), stack);
             vkGetPhysicalDeviceSurfaceFormatsKHR(VulkanInstance.getPhysicalDevice(), surface, pSurfaceFormatCount, formats);
 
-            imageFormat = VK10.VK_FORMAT_B8G8R8A8_UNORM;
+            imageFormat = formats.get(0).format();
+            imageColorSpace = formats.get(0).colorSpace();
             for (int i = 0; i < formats.capacity(); i++) {
                 VkSurfaceFormatKHR fmt = formats.get(i);
-                if (fmt.format() == VK10.VK_FORMAT_B8G8R8A8_UNORM) {
+                if (fmt.format() == VK10.VK_FORMAT_B8G8R8A8_SRGB &&
+                    fmt.colorSpace() == KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                     imageFormat = fmt.format();
+                    imageColorSpace = fmt.colorSpace();
                     break;
                 }
             }
 
-            int minImageCount = capabilities.minImageCount();
-            int desiredImageCount = Math.max(minImageCount, 2);
+            int desiredImageCount = Math.max(capabilities.minImageCount() + 1, 2);
+            if (capabilities.maxImageCount() > 0) {
+                desiredImageCount = Math.min(desiredImageCount, capabilities.maxImageCount());
+            }
 
             VkExtent2D extent = capabilities.currentExtent();
+            if (extent.width() == 0xFFFFFFFF || extent.height() == 0xFFFFFFFF) {
+                IntBuffer framebufferWidth = stack.ints(0);
+                IntBuffer framebufferHeight = stack.ints(0);
+                GLFW.glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
+                extent.width(Math.max(1, framebufferWidth.get(0)));
+                extent.height(Math.max(1, framebufferHeight.get(0)));
+            }
             width = extent.width();
             height = extent.height();
+
+            int preTransform = (capabilities.supportedTransforms() & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0
+                ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
+                : capabilities.currentTransform();
+            int compositeAlpha = chooseCompositeAlpha(capabilities.supportedCompositeAlpha());
 
             VkSwapchainCreateInfoKHR createInfo = VkSwapchainCreateInfoKHR.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
             createInfo.surface(surface);
             createInfo.minImageCount(desiredImageCount);
             createInfo.imageFormat(imageFormat);
-            createInfo.imageColorSpace(KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+            createInfo.imageColorSpace(imageColorSpace);
             createInfo.imageExtent(extent);
             createInfo.imageArrayLayers(1);
             createInfo.imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
             createInfo.imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
-            createInfo.preTransform(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
-            createInfo.compositeAlpha(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
+            createInfo.preTransform(preTransform);
+            createInfo.compositeAlpha(compositeAlpha);
             createInfo.presentMode(VK_PRESENT_MODE_FIFO_KHR);
             createInfo.clipped(true);
             createInfo.oldSwapchain(VK10.VK_NULL_HANDLE);
 
             LongBuffer pSwapchain = stack.mallocLong(1);
-            int result = vkCreateSwapchainKHR(VulkanDevice.getDevice(), createInfo, null, pSwapchain);
+            result = vkCreateSwapchainKHR(VulkanDevice.getDevice(), createInfo, null, pSwapchain);
             if (result != VK_SUCCESS) {
                 throw new RuntimeException("Failed to create swapchain: " + result);
             }
@@ -141,6 +174,19 @@ public class VulkanSwapchain {
         return imageFormat;
     }
 
+    private static int chooseCompositeAlpha(int supported) {
+        int[] candidates = {
+            VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+            VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+            VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
+        };
+        for (int candidate : candidates) {
+            if ((supported & candidate) != 0) return candidate;
+        }
+        throw new RuntimeException("The Vulkan surface exposes no supported composite alpha mode");
+    }
+
     public static int getWidth() {
         return width;
     }
@@ -153,18 +199,26 @@ public class VulkanSwapchain {
         return surface;
     }
 
-    public static void cleanup() {
+    public static void cleanupSwapchain() {
         if (imageViews != null) {
             for (long iv : imageViews) {
                 if (iv != MemoryUtil.NULL) {
                     vkDestroyImageView(VulkanDevice.getDevice(), iv, null);
                 }
             }
+            imageViews = null;
         }
         if (swapchain != MemoryUtil.NULL) {
             vkDestroySwapchainKHR(VulkanDevice.getDevice(), swapchain, null);
             swapchain = MemoryUtil.NULL;
         }
+        swapchainImages = null;
+        width = 0;
+        height = 0;
+    }
+
+    public static void cleanup() {
+        cleanupSwapchain();
         if (surface != MemoryUtil.NULL) {
             vkDestroySurfaceKHR(VulkanInstance.getInstance(), surface, null);
             surface = MemoryUtil.NULL;

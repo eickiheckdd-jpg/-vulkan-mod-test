@@ -115,6 +115,7 @@ public class VulkanRenderPass {
     public static void cleanup() {
         if (renderPass != VK10.VK_NULL_HANDLE) {
             vkDestroyRenderPass(VulkanDevice.getDevice(), renderPass, null);
+            renderPass = VK10.VK_NULL_HANDLE;
         }
     }
 }

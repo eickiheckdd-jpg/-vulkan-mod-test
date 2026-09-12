@@ -3,7 +3,6 @@ package net.vulkanmod.mixin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.RunArgs;
 import net.vulkanmod.VulkanMod;
-import net.vulkanmod.render.VulkanTextureBridge;
 import net.vulkanmod.vulkan.MinecraftInstance;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,6 +18,5 @@ public class MinecraftMixin {
         MinecraftInstance.setWindowHandle(MinecraftClient.getInstance().getWindow().getHandle());
         VulkanMod.LOGGER.info("Window handle captured: 0x{}", Long.toHexString(MinecraftInstance.getWindowHandle()));
 
-        VulkanTextureBridge.initialize();
     }
 }

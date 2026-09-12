@@ -1,6 +1,7 @@
 package net.vulkanmod.vulkan;
 
 import net.vulkanmod.VulkanMod;
+import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -17,6 +18,7 @@ import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
+import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -54,6 +56,18 @@ public class VulkanInstance {
                 availableExtensions.add(extensions.get(i).extensionNameString());
             }
 
+            PointerBuffer glfwExtensions = glfwGetRequiredInstanceExtensions();
+            if (glfwExtensions == null) {
+                throw new RuntimeException("GLFW could not provide the required Vulkan surface extensions");
+            }
+
+            for (int i = 0; i < glfwExtensions.remaining(); i++) {
+                String required = MemoryUtil.memUTF8(glfwExtensions.get(i));
+                if (!availableExtensions.contains(required)) {
+                    throw new RuntimeException("Missing required GLFW instance extension: " + required);
+                }
+            }
+
             for (String required : REQUIRED_INSTANCE_EXTENSIONS) {
                 if (!availableExtensions.contains(required)) {
                     throw new RuntimeException("Missing required instance extension: " + required);
@@ -73,6 +87,18 @@ public class VulkanInstance {
             VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.callocStack(stack);
             createInfo.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
             createInfo.pApplicationInfo(appInfo);
+
+            PointerBuffer enabledExtensions = stack.mallocPointer(
+                glfwExtensions.remaining() + (debugUtilsAvailable ? 1 : 0)
+            );
+            for (int i = 0; i < glfwExtensions.remaining(); i++) {
+                enabledExtensions.put(glfwExtensions.get(i));
+            }
+            if (debugUtilsAvailable) {
+                enabledExtensions.put(stack.UTF8(VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
+            }
+            enabledExtensions.flip();
+            createInfo.ppEnabledExtensionNames(enabledExtensions);
 
             if (debugUtilsAvailable) {
                 VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = VkDebugUtilsMessengerCreateInfoEXT.callocStack(stack);
@@ -143,6 +169,10 @@ public class VulkanInstance {
 
     public static void selectPhysicalDevice() {
         try (MemoryStack stack = stackPush()) {
+            if (VulkanSwapchain.getSurface() == NULL) {
+                throw new RuntimeException("Cannot select a present-capable Vulkan device before creating the surface");
+            }
+
             IntBuffer pDeviceCount = stack.ints(0);
             vkEnumeratePhysicalDevices(instance, pDeviceCount, null);
             if (pDeviceCount.get(0) == 0) {
@@ -152,45 +182,83 @@ public class VulkanInstance {
             PointerBuffer pDevices = stack.mallocPointer(pDeviceCount.get(0));
             vkEnumeratePhysicalDevices(instance, pDeviceCount, pDevices);
 
-            physicalDevice = new VkPhysicalDevice(pDevices.get(0), instance);
+            for (int deviceIndex = 0; deviceIndex < pDeviceCount.get(0); deviceIndex++) {
+                VkPhysicalDevice candidate = new VkPhysicalDevice(pDevices.get(deviceIndex), instance);
+                if (!supportsRequiredDeviceExtensions(candidate, stack)) {
+                    continue;
+                }
+
+                IntBuffer pQueueFamilyCount = stack.ints(0);
+                vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, null);
+                VkQueueFamilyProperties.Buffer queueFamilies =
+                    VkQueueFamilyProperties.calloc(pQueueFamilyCount.get(0), stack);
+                vkGetPhysicalDeviceQueueFamilyProperties(candidate, pQueueFamilyCount, queueFamilies);
+
+                int candidateGraphicsFamily = -1;
+                int candidatePresentFamily = -1;
+                IntBuffer presentSupport = stack.ints(VK_FALSE);
+                for (int i = 0; i < queueFamilies.capacity(); i++) {
+                    VkQueueFamilyProperties props = queueFamilies.get(i);
+                    if ((props.queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0) {
+                        candidateGraphicsFamily = i;
+                    }
+                    vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, VulkanSwapchain.getSurface(), presentSupport);
+                    if (presentSupport.get(0) == VK_TRUE) {
+                        candidatePresentFamily = i;
+                    }
+                    if (candidateGraphicsFamily >= 0 && candidatePresentFamily >= 0) {
+                        break;
+                    }
+                }
+
+                VkPhysicalDeviceProperties candidateProperties = VkPhysicalDeviceProperties.callocStack(stack);
+                vkGetPhysicalDeviceProperties(candidate, candidateProperties);
+                if (candidateGraphicsFamily < 0 ||
+                    candidatePresentFamily < 0 ||
+                    candidateProperties.apiVersion() < VK11.VK_MAKE_VERSION(1, 1, 0)) {
+                    continue;
+                }
+
+                physicalDevice = candidate;
+                graphicsQueueFamilyIndex = candidateGraphicsFamily;
+                presentQueueFamilyIndex = candidatePresentFamily;
+                deviceProperties = VkPhysicalDeviceProperties.calloc();
+                deviceProperties.set(candidateProperties);
+                deviceFeatures = VkPhysicalDeviceFeatures.calloc();
+                vkGetPhysicalDeviceFeatures(candidate, deviceFeatures);
+                vulkan11Available = true;
+                break;
+            }
+
             if (physicalDevice == null || physicalDevice.address() == NULL) {
-                throw new RuntimeException("Failed to select physical device");
-            }
-
-            deviceProperties = VkPhysicalDeviceProperties.callocStack(stack);
-            vkGetPhysicalDeviceProperties(physicalDevice, deviceProperties);
-
-            deviceFeatures = VkPhysicalDeviceFeatures.callocStack(stack);
-            vkGetPhysicalDeviceFeatures(physicalDevice, deviceFeatures);
-
-            vulkan11Available = deviceProperties.apiVersion() >= VK11.VK_MAKE_VERSION(1, 1, 0);
-
-            IntBuffer pQueueFamilyCount = stack.ints(0);
-            vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, pQueueFamilyCount, null);
-            VkQueueFamilyProperties.Buffer queueFamilies = VkQueueFamilyProperties.calloc(pQueueFamilyCount.get(0), stack);
-            vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, pQueueFamilyCount, queueFamilies);
-
-            for (int i = 0; i < queueFamilies.capacity(); i++) {
-                VkQueueFamilyProperties props = queueFamilies.get(i);
-                if ((props.queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0) {
-                    graphicsQueueFamilyIndex = i;
-                }
-                if ((props.queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0) {
-                    presentQueueFamilyIndex = i;
-                    break;
-                }
-            }
-
-            if (graphicsQueueFamilyIndex < 0) {
-                throw new RuntimeException("No graphics queue family found");
-            }
-            if (presentQueueFamilyIndex < 0) {
-                presentQueueFamilyIndex = graphicsQueueFamilyIndex;
+                throw new RuntimeException("No Vulkan 1.1 device with graphics, present, and swapchain support found");
             }
 
             VulkanMod.LOGGER.info("Selected physical device: {}", deviceProperties.deviceNameString());
             VulkanMod.LOGGER.info("Graphics queue family: {}, Present queue family: {}", graphicsQueueFamilyIndex, presentQueueFamilyIndex);
         }
+    }
+
+    private static boolean supportsRequiredDeviceExtensions(VkPhysicalDevice candidate, MemoryStack stack) {
+        IntBuffer count = stack.ints(0);
+        if (vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, count, null) != VK_SUCCESS) {
+            return false;
+        }
+        VkExtensionProperties.Buffer extensions = VkExtensionProperties.calloc(count.get(0), stack);
+        if (vkEnumerateDeviceExtensionProperties(candidate, (ByteBuffer) null, count, extensions) != VK_SUCCESS) {
+            return false;
+        }
+        for (String required : REQUIRED_DEVICE_EXTENSIONS) {
+            boolean found = false;
+            for (int i = 0; i < extensions.capacity(); i++) {
+                if (required.equals(extensions.get(i).extensionNameString())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+        return true;
     }
 
     public static VkInstance getInstance() {
@@ -230,5 +298,17 @@ public class VulkanInstance {
             vkDestroyInstance(instance, null);
             instance = null;
         }
+        if (deviceProperties != null) {
+            deviceProperties.free();
+            deviceProperties = null;
+        }
+        if (deviceFeatures != null) {
+            deviceFeatures.free();
+            deviceFeatures = null;
+        }
+        physicalDevice = null;
+        graphicsQueueFamilyIndex = -1;
+        presentQueueFamilyIndex = -1;
+        vulkan11Available = false;
     }
 }

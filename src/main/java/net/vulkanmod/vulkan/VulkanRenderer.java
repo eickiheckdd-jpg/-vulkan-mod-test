@@ -8,6 +8,7 @@ import net.vulkanmod.render.VulkanIndirectDrawSystem;
 import net.vulkanmod.render.VulkanMultiThreadedRenderer;
 import net.vulkanmod.render.VulkanPerformanceStats;
 import net.vulkanmod.render.VulkanTextureStreamer;
+import net.vulkanmod.render.VulkanTextureBridge;
 import net.vulkanmod.vulkan.VulkanTextureCapture;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.PointerBuffer;
@@ -37,10 +38,9 @@ public class VulkanRenderer {
 
     private static long window;
     private static State state = State.UNINITIALIZED;
-    private static long[] imageAvailableSemaphores;
-    private static long[] renderFinishedSemaphores;
-    private static long debugMessenger;
-    private static int frameIndex = 0;
+    private static long imageAvailableSemaphore;
+    private static long renderFinishedSemaphore;
+    private static long inFlightFence;
 
     public static boolean isVulkanAvailable() {
         return glfwVulkanSupported();
@@ -61,12 +61,12 @@ public class VulkanRenderer {
             throw new RuntimeException("Window handle not available");
         }
 
-        logSystemInfo();
-
         try {
             VulkanInstance.create();
+            VulkanSwapchain.createSurface(window);
             VulkanInstance.selectPhysicalDevice();
             VulkanDevice.create();
+            logSystemInfo();
             VulkanSwapchain.create(window);
             VulkanRenderPass.create();
             VulkanFramebuffer.create();
@@ -78,6 +78,7 @@ public class VulkanRenderer {
             VulkanMultiThreadedRenderer.initialize();
             VulkanTextureStreamer.initialize();
             VulkanFrustumCuller.initialize();
+            VulkanTextureBridge.initialize();
             createSyncObjects();
             VulkanCommandBuffer.create();
 
@@ -92,10 +93,6 @@ public class VulkanRenderer {
 
     private static void createSyncObjects() {
         try (MemoryStack stack = stackPush()) {
-            int imageCount = VulkanSwapchain.getSwapchainImages().length;
-            imageAvailableSemaphores = new long[imageCount];
-            renderFinishedSemaphores = new long[imageCount];
-
             VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.callocStack(stack);
             semaphoreInfo.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
 
@@ -104,18 +101,20 @@ public class VulkanRenderer {
             fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
 
             LongBuffer pSemaphore = stack.mallocLong(1);
+            int result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
+            if (result != VK_SUCCESS) throw new RuntimeException("Failed to create image-available semaphore: " + result);
+            imageAvailableSemaphore = pSemaphore.get(0);
 
-            for (int i = 0; i < imageCount; i++) {
-                int result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
-                if (result != VK_SUCCESS) throw new RuntimeException("Failed to create semaphore: " + result);
-                imageAvailableSemaphores[i] = pSemaphore.get(0);
+            result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
+            if (result != VK_SUCCESS) throw new RuntimeException("Failed to create render-finished semaphore: " + result);
+            renderFinishedSemaphore = pSemaphore.get(0);
 
-                result = vkCreateSemaphore(VulkanDevice.getDevice(), semaphoreInfo, null, pSemaphore);
-                if (result != VK_SUCCESS) throw new RuntimeException("Failed to create semaphore: " + result);
-                renderFinishedSemaphores[i] = pSemaphore.get(0);
-            }
+            LongBuffer pFence = stack.mallocLong(1);
+            result = vkCreateFence(VulkanDevice.getDevice(), fenceInfo, null, pFence);
+            if (result != VK_SUCCESS) throw new RuntimeException("Failed to create in-flight fence: " + result);
+            inFlightFence = pFence.get(0);
 
-            VulkanMod.LOGGER.info("Sync objects created ({} pairs)", imageCount);
+            VulkanMod.LOGGER.info("Synchronization objects created");
         }
     }
 
@@ -127,12 +126,19 @@ public class VulkanRenderer {
         VulkanPerformanceStats.beginFrame();
 
         try (MemoryStack stack = stackPush()) {
+            int waitResult = vkWaitForFences(
+                VulkanDevice.getDevice(), stack.longs(inFlightFence), true, Long.MAX_VALUE
+            );
+            if (waitResult != VK_SUCCESS) {
+                VulkanMod.LOGGER.error("Failed waiting for the previous Vulkan frame: {}", waitResult);
+                return;
+            }
             IntBuffer pImageIndex = stack.ints(0);
             int result = vkAcquireNextImageKHR(
                 VulkanDevice.getDevice(),
                 VulkanSwapchain.getSwapchain(),
                 Long.MAX_VALUE,
-                imageAvailableSemaphores[frameIndex],
+                imageAvailableSemaphore,
                 VK10.VK_NULL_HANDLE,
                 pImageIndex
             );
@@ -146,6 +152,7 @@ public class VulkanRenderer {
                 return;
             }
 
+            vkResetFences(VulkanDevice.getDevice(), stack.longs(inFlightFence));
             int imageIndex = pImageIndex.get(0);
 
             boolean hasCapture = false;
@@ -176,17 +183,17 @@ public class VulkanRenderer {
             VkSubmitInfo submitInfo = VkSubmitInfo.callocStack(stack);
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO);
             LongBuffer pWaitSemaphores = stack.mallocLong(1);
-            pWaitSemaphores.put(0, imageAvailableSemaphores[frameIndex]).flip();
+            pWaitSemaphores.put(0, imageAvailableSemaphore).flip();
             submitInfo.pWaitSemaphores(pWaitSemaphores);
             submitInfo.pWaitDstStageMask(stack.ints(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT));
             PointerBuffer pCommandBuffers = stack.mallocPointer(1);
             pCommandBuffers.put(0, VulkanCommandBuffer.getCommandBuffers()[imageIndex]).flip();
             submitInfo.pCommandBuffers(pCommandBuffers);
             LongBuffer pSignalSemaphores = stack.mallocLong(1);
-            pSignalSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
+            pSignalSemaphores.put(0, renderFinishedSemaphore).flip();
             submitInfo.pSignalSemaphores(pSignalSemaphores);
 
-            result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, VulkanCommandBuffer.getFence(imageIndex));
+            result = vkQueueSubmit(VulkanDevice.getGraphicsQueue(), submitInfo, inFlightFence);
             if (result != VK_SUCCESS) {
                 VulkanMod.LOGGER.error("Failed to submit draw command buffer: {}", result);
                 return;
@@ -195,7 +202,7 @@ public class VulkanRenderer {
             VkPresentInfoKHR presentInfo = VkPresentInfoKHR.callocStack(stack);
             presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
             LongBuffer pPresentWaitSemaphores = stack.mallocLong(1);
-            pPresentWaitSemaphores.put(0, renderFinishedSemaphores[frameIndex]).flip();
+            pPresentWaitSemaphores.put(0, renderFinishedSemaphore).flip();
             presentInfo.pWaitSemaphores(pPresentWaitSemaphores);
             LongBuffer pSwapchains = stack.mallocLong(1);
             pSwapchains.put(0, VulkanSwapchain.getSwapchain()).flip();
@@ -210,7 +217,6 @@ public class VulkanRenderer {
                 return;
             }
 
-            frameIndex = (frameIndex + 1) % imageAvailableSemaphores.length;
         }
 
         VulkanPerformanceStats.endFrame();
@@ -219,8 +225,12 @@ public class VulkanRenderer {
     public static void recreateSwapchain() {
         if (state != State.READY) return;
         VulkanMod.LOGGER.info("Recreating swapchain...");
+        vkDeviceWaitIdle(VulkanDevice.getDevice());
         cleanupSwapchainResources();
+        VulkanRenderPass.cleanup();
+        VulkanSwapchain.cleanupSwapchain();
         VulkanSwapchain.create(window);
+        VulkanRenderPass.create();
         VulkanFramebuffer.create();
         VulkanCommandBuffer.create();
     }
@@ -248,17 +258,22 @@ public class VulkanRenderer {
     public static void cleanup() {
         if (state == State.UNINITIALIZED) return;
 
+        if (VulkanDevice.getDevice() != null) {
+            vkDeviceWaitIdle(VulkanDevice.getDevice());
+        }
         cleanupSwapchainResources();
 
-        if (imageAvailableSemaphores != null) {
-            for (long sem : imageAvailableSemaphores) {
-                if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
-            }
+        if (imageAvailableSemaphore != MemoryUtil.NULL) {
+            vkDestroySemaphore(VulkanDevice.getDevice(), imageAvailableSemaphore, null);
+            imageAvailableSemaphore = MemoryUtil.NULL;
         }
-        if (renderFinishedSemaphores != null) {
-            for (long sem : renderFinishedSemaphores) {
-                if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
-            }
+        if (renderFinishedSemaphore != MemoryUtil.NULL) {
+            vkDestroySemaphore(VulkanDevice.getDevice(), renderFinishedSemaphore, null);
+            renderFinishedSemaphore = MemoryUtil.NULL;
+        }
+        if (inFlightFence != MemoryUtil.NULL) {
+            vkDestroyFence(VulkanDevice.getDevice(), inFlightFence, null);
+            inFlightFence = MemoryUtil.NULL;
         }
 
         VulkanCommandBuffer.cleanup();
@@ -268,6 +283,7 @@ public class VulkanRenderer {
         VulkanVertexCapture.cleanup();
         VulkanFullscreenQuad.cleanup();
         VulkanTextureStreamer.cleanup();
+        VulkanTextureBridge.cleanup();
         VulkanFrustumCuller.cleanup();
         VulkanPipeline.cleanup();
         VulkanRenderPass.cleanup();
@@ -284,20 +300,20 @@ public class VulkanRenderer {
         try {
             cleanupSwapchainResources();
 
-            if (imageAvailableSemaphores != null) {
-                for (long sem : imageAvailableSemaphores) {
-                    if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
-                }
+            if (imageAvailableSemaphore != MemoryUtil.NULL) {
+                vkDestroySemaphore(VulkanDevice.getDevice(), imageAvailableSemaphore, null);
             }
-            if (renderFinishedSemaphores != null) {
-                for (long sem : renderFinishedSemaphores) {
-                    if (sem != MemoryUtil.NULL) vkDestroySemaphore(VulkanDevice.getDevice(), sem, null);
-                }
+            if (renderFinishedSemaphore != MemoryUtil.NULL) {
+                vkDestroySemaphore(VulkanDevice.getDevice(), renderFinishedSemaphore, null);
+            }
+            if (inFlightFence != MemoryUtil.NULL) {
+                vkDestroyFence(VulkanDevice.getDevice(), inFlightFence, null);
             }
 
             VulkanCommandBuffer.cleanup();
             VulkanFullscreenQuad.cleanup();
             VulkanTextureStreamer.cleanup();
+            VulkanTextureBridge.cleanup();
             VulkanPipeline.cleanup();
             VulkanRenderPass.cleanup();
             VulkanFramebuffer.cleanup();

@@ -27,13 +27,11 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class VulkanCommandBuffer {
     private static long[] commandBuffers;
-    private static long[] perFrameFences;
 
     public static void create() {
         try (MemoryStack stack = stackPush()) {
             int imageCount = VulkanSwapchain.getSwapchainImages().length;
             commandBuffers = new long[imageCount];
-            perFrameFences = new long[imageCount];
 
             VkCommandBufferAllocateInfo allocInfo = VkCommandBufferAllocateInfo.callocStack(stack);
             allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
@@ -50,26 +48,12 @@ public class VulkanCommandBuffer {
                 commandBuffers[i] = pCommandBuffers.get(i);
             }
 
-            VkFenceCreateInfo fenceInfo = VkFenceCreateInfo.callocStack(stack);
-            fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO);
-            fenceInfo.flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
-
-            LongBuffer pFence = stack.mallocLong(1);
-            for (int i = 0; i < imageCount; i++) {
-                result = vkCreateFence(VulkanDevice.getDevice(), fenceInfo, null, pFence);
-                if (result != VK_SUCCESS) {
-                    throw new RuntimeException("Failed to create per-frame fence: " + result);
-                }
-                perFrameFences[i] = pFence.get(0);
-            }
-
             VulkanMod.LOGGER.info("Command buffers allocated (count={})", imageCount);
         }
     }
 
     public static long getFence(int imageIndex) {
-        if (imageIndex < 0 || imageIndex >= perFrameFences.length) return NULL;
-        return perFrameFences[imageIndex];
+        return NULL;
     }
 
     public static void recordCommandBuffer(int imageIndex, boolean hasCapturedTexture) {
@@ -252,15 +236,6 @@ public class VulkanCommandBuffer {
             vkFreeCommandBuffers(VulkanDevice.getDevice(), VulkanDevice.getCommandPool(), pCommandBuffers);
             MemoryUtil.memFree(pCommandBuffers);
             commandBuffers = null;
-        }
-        if (perFrameFences != null) {
-            for (int i = 0; i < perFrameFences.length; i++) {
-                if (perFrameFences[i] != VK10.VK_NULL_HANDLE) {
-                    vkDestroyFence(VulkanDevice.getDevice(), perFrameFences[i], null);
-                    perFrameFences[i] = VK10.VK_NULL_HANDLE;
-                }
-            }
-            perFrameFences = null;
         }
     }
 }

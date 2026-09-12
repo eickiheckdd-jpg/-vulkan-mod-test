@@ -10,6 +10,8 @@ import java.nio.FloatBuffer;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.VK11.*;
@@ -27,17 +29,18 @@ public class VulkanDevice {
         try (MemoryStack stack = stackPush()) {
             FloatBuffer pQueuePriorities = stack.floats(1.0f);
 
-            VkDeviceQueueCreateInfo.Buffer queueCreateInfos = VkDeviceQueueCreateInfo.callocStack(2, stack);
-
-            VkDeviceQueueCreateInfo graphicsQueueInfo = queueCreateInfos.get(0);
-            graphicsQueueInfo.sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
-            graphicsQueueInfo.queueFamilyIndex(VulkanInstance.getGraphicsQueueFamilyIndex());
-            graphicsQueueInfo.pQueuePriorities(pQueuePriorities);
-
-            VkDeviceQueueCreateInfo presentQueueInfo = queueCreateInfos.get(1);
-            presentQueueInfo.sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
-            presentQueueInfo.queueFamilyIndex(VulkanInstance.getPresentQueueFamilyIndex());
-            presentQueueInfo.pQueuePriorities(pQueuePriorities);
+            Set<Integer> queueFamilies = new HashSet<>();
+            queueFamilies.add(VulkanInstance.getGraphicsQueueFamilyIndex());
+            queueFamilies.add(VulkanInstance.getPresentQueueFamilyIndex());
+            VkDeviceQueueCreateInfo.Buffer queueCreateInfos =
+                VkDeviceQueueCreateInfo.callocStack(queueFamilies.size(), stack);
+            int queueIndex = 0;
+            for (int family : queueFamilies) {
+                VkDeviceQueueCreateInfo queueInfo = queueCreateInfos.get(queueIndex++);
+                queueInfo.sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
+                queueInfo.queueFamilyIndex(family);
+                queueInfo.pQueuePriorities(pQueuePriorities);
+            }
 
             VkPhysicalDeviceFeatures deviceFeatures = VkPhysicalDeviceFeatures.callocStack(stack);
             deviceFeatures.set(VulkanInstance.getDeviceFeatures());
@@ -47,9 +50,13 @@ public class VulkanDevice {
             deviceCreateInfo.pQueueCreateInfos(queueCreateInfos);
             deviceCreateInfo.pEnabledFeatures(deviceFeatures);
 
-            PointerBuffer ppEnabledExtensionNames = stack.mallocPointer(1);
-            ByteBuffer swapchainExt = stack.UTF8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-            ppEnabledExtensionNames.put(swapchainExt).flip();
+            PointerBuffer ppEnabledExtensionNames = stack.mallocPointer(
+                VulkanInstance.REQUIRED_DEVICE_EXTENSIONS.length
+            );
+            for (String extension : VulkanInstance.REQUIRED_DEVICE_EXTENSIONS) {
+                ppEnabledExtensionNames.put(stack.UTF8(extension));
+            }
+            ppEnabledExtensionNames.flip();
             deviceCreateInfo.ppEnabledExtensionNames(ppEnabledExtensionNames);
 
             PointerBuffer pDevice = stack.mallocPointer(1);
@@ -101,9 +108,13 @@ public class VulkanDevice {
     public static void cleanup() {
         if (commandPool != VK10.VK_NULL_HANDLE) {
             vkDestroyCommandPool(device, commandPool, null);
+            commandPool = VK10.VK_NULL_HANDLE;
         }
         if (device != null) {
             vkDestroyDevice(device, null);
+            device = null;
+            graphicsQueue = null;
+            presentQueue = null;
         }
     }
 
